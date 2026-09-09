@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DeepSeek Harness</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <section id="login" class="login" hidden>
+      <div class="panel">
+        <p class="eyebrow">DeepSeek Harness</p>
+        <h1>Sign in</h1>
+        <p class="lede">Local wrangler dev uses the access key. Production uses Cloudflare Access.</p>
+        <label>
+          Access key
+          <input id="access-key" type="password" autocomplete="current-password" />
+        </label>
+        <button id="login-btn" type="button">Enter</button>
+        <p id="login-error" class="error" hidden></p>
+      </div>
+    </section>
+
+    <div id="app" class="shell" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">dsh on Cloudflare</p>
+          <button id="new-session" type="button">New session</button>
+        </div>
+        <nav id="session-list" class="session-list"></nav>
+      </aside>
+      <section class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="session-title">New session</h1>
+            <p id="session-meta" class="muted"></p>
+          </div>
+          <div class="top-actions">
+            <label class="inline">
+              Permissions
+              <select id="permission">
+                <option value="workspace-write">workspace-write</option>
+                <option value="danger-full-access">danger-full-access</option>
+              </select>
+            </label>
+            <span id="user-email" class="muted"></span>
+            <button id="fork-btn" class="ghost" type="button">Fork</button>
+            <button id="cancel-btn" class="ghost" type="button">Cancel</button>
+            <button id="logout-btn" class="ghost" type="button">Sign out</button>
+          </div>
+        </header>
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+        <form id="composer" class="composer">
+          <textarea id="prompt" rows="3" placeholder="Message, or /compact /plan /permission …"></textarea>
+          <div class="row">
+            <button type="submit">Send</button>
+            <p id="composer-hint" class="muted"></p>
+          </div>
+        </form>
+      </section>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
