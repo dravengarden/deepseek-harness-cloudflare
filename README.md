@@ -73,7 +73,7 @@ More detail: [`docs/architecture.md`](docs/architecture.md),
 | Linux via official Sandbox (`bash`, files, glob/grep/str_replace) | Yes |
 | `/workspace` persistence via `createBackup` on `onActivityExpired` | Yes |
 | Permissions: `workspace-write` (ask) / `danger-full-access` (never ask) | Yes |
-| Web UI: session sidebar, chat, commands, Access or local key | Yes |
+| Web UI: official workbench layout (rail, sessions, chat) on `/api` | Yes (not the Typert React client) |
 | Plugin host: `composeHarness(env, sql, { plugins })` | Yes |
 
 ## What is not migrated

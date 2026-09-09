@@ -2,6 +2,8 @@ const loginEl = document.querySelector("#login")
 const appEl = document.querySelector("#app")
 const errorEl = document.querySelector("#login-error")
 const listEl = document.querySelector("#session-list")
+const sidebarEl = document.querySelector("#sidebar")
+const workbenchEl = document.querySelector("#app")
 const transcriptEl = document.querySelector("#transcript")
 const titleEl = document.querySelector("#session-title")
 const metaEl = document.querySelector("#session-meta")
@@ -248,6 +250,15 @@ document.querySelector("#logout-btn").addEventListener("click", async () => {
   const body = await api("/api/logout", { method: "POST", body: "{}" }).then((r) => r.json())
   if (body.logout) location.href = body.logout
   else location.reload()
+})
+
+document.querySelector("#toggle-rail").addEventListener("click", () => {
+  sidebarEl.classList.toggle("collapsed")
+  workbenchEl.classList.toggle("rail-only")
+})
+
+document.querySelector("#new-session-wide").addEventListener("click", () => {
+  document.querySelector("#new-session").click()
 })
 
 document.querySelector("#new-session").addEventListener("click", async () => {

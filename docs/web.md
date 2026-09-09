@@ -46,6 +46,18 @@ The top-bar selector is the official dsh pair of presets:
 
 There is no Unix account model and no `users.yaml`.
 
+## Official GUI vs this host
+
+`@deepseek-ai/dsh-web-frontend` is the real dsh web client. It boots only after
+the Node host injects `window.__ModuleLoader__` and `window.__DSH_BOOT__`, then
+talks Typert RPC (`/api/remote.mux`, session.create/prompt, …). That host plane
+is not on Workers.
+
+This repo therefore ships a **Workbench-shaped SPA** using the official dark
+tokens (`--dsw-*`, DeepSeek wordmark, 56px rail + session sidebar, composer)
+and the official favicon, wired to this host's `/api`. It is not the React
+slot client.
+
 ## UI
 
 The SPA mirrors the official web *surface*, not the Node app:
