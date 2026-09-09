@@ -45,3 +45,18 @@ The top-bar selector is the official dsh pair of presets:
   is no host filesystem to unlock); mutating tools do not ask.
 
 There is no Unix account model and no `users.yaml`.
+
+## UI
+
+The SPA mirrors the official web *surface*, not the Node app:
+
+- Session sidebar, fork, cancel, compact
+- Streaming assistant text and thinking
+- Tool calls, todos, ask-user prompts
+- Slash-command menu from `/api/commands`
+- Permission preset in the top bar
+
+History replay uses settled events only (`assistant/message`, tools), not
+live `assistant/chunk` rows, so reopening a session does not duplicate
+streamed text.
+

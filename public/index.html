@@ -44,6 +44,7 @@
               </select>
             </label>
             <span id="user-email" class="muted"></span>
+            <button id="compact-btn" class="ghost" type="button">Compact</button>
             <button id="fork-btn" class="ghost" type="button">Fork</button>
             <button id="cancel-btn" class="ghost" type="button">Cancel</button>
             <button id="logout-btn" class="ghost" type="button">Sign out</button>
@@ -52,6 +53,7 @@
         <div id="transcript" class="transcript" aria-live="polite"></div>
         <form id="composer" class="composer">
           <textarea id="prompt" rows="3" placeholder="Message, or /compact /plan /permission …"></textarea>
+          <div id="slash-menu" class="slash-menu" hidden></div>
           <div class="row">
             <button type="submit">Send</button>
             <p id="composer-hint" class="muted"></p>

@@ -9,11 +9,24 @@ const promptEl = document.querySelector("#prompt")
 const hintEl = document.querySelector("#composer-hint")
 const emailEl = document.querySelector("#user-email")
 const permissionEl = document.querySelector("#permission")
+const slashEl = document.querySelector("#slash-menu")
+
+const HISTORY_SKIP = new Set([
+  "assistant/chunk",
+  "assistant/thinking",
+  "step/start",
+  "step/end",
+  "turn/start",
+  "turn/end",
+  "skill/catalog",
+])
 
 let me = null
 let sessions = []
 let current = null
 let sending = false
+let commands = []
+let slashIndex = 0
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -49,17 +62,33 @@ function renderSessions() {
   }
 }
 
-function renderEvent(event) {
+function lastStream(kind) {
+  const node = transcriptEl.querySelector(`.card.${kind}:last-of-type`)
+  return node?.dataset.stream === "1" ? node : null
+}
+
+function renderEvent(event, live) {
   const payload = event.payload ?? {}
+  if (!live && HISTORY_SKIP.has(event.type)) return
+  if (!live && event.type === "ask/question") return
   if (event.type === "user/message") card("user", payload.content)
-  else if (event.type === "assistant/message" && payload.content) card("assistant", payload.content)
-  else if (event.type === "assistant/chunk") {
-    const last = transcriptEl.querySelector(".card.assistant:last-of-type")
-    if (last && last.dataset.stream === "1") last.textContent += payload.text
+  else if (event.type === "assistant/thinking" && live) {
+    const existing = lastStream("thinking")
+    if (existing) existing.textContent += payload.text
+    else {
+      const el = card("thinking", payload.text)
+      el.dataset.stream = "1"
+    }
+  } else if (event.type === "assistant/chunk" && live) {
+    const existing = lastStream("assistant")
+    if (existing) existing.textContent += payload.text
     else {
       const el = card("assistant", payload.text)
       el.dataset.stream = "1"
     }
+  } else if (event.type === "assistant/message") {
+    if (live && lastStream("assistant")) return
+    if (payload.content) card("assistant", payload.content)
   } else if (event.type === "tool/call") {
     card("tool", `${payload.name} ${payload.arguments ?? ""}`.slice(0, 800))
   } else if (event.type === "tool/result") {
@@ -67,7 +96,8 @@ function renderEvent(event) {
   } else if (event.type === "todo/write") {
     const todos = payload.todos ?? []
     card("todo", todos.map((item) => `[${item.status}] ${item.content}`).join("\n"))
-  } else if (event.type === "ask/question") renderAsk(payload)
+  } else if (event.type === "ask/question" && live) renderAsk(payload)
+  else if (event.type === "skill/inject") card("tool", payload.content)
   else if (event.type === "error") card("error", payload.message)
 }
 
@@ -101,6 +131,41 @@ function renderAsk(payload) {
   }
 }
 
+function matchedCommands() {
+  const value = promptEl.value
+  if (!value.startsWith("/") || value.includes("\n")) return []
+  const q = value.slice(1).toLowerCase()
+  return commands.filter((command) => command.name.startsWith(q) || `/${command.name}`.startsWith(value.toLowerCase()))
+}
+
+function renderSlash() {
+  const hits = matchedCommands()
+  if (hits.length === 0) {
+    slashEl.hidden = true
+    return
+  }
+  slashIndex = Math.max(0, Math.min(slashIndex, hits.length - 1))
+  slashEl.hidden = false
+  slashEl.replaceChildren()
+  hits.forEach((command, index) => {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = index === slashIndex ? "active" : ""
+    const code = document.createElement("code")
+    code.textContent = `/${command.name}`
+    const desc = document.createElement("span")
+    desc.className = "desc"
+    desc.textContent = ` ${command.description}`
+    button.append(code, desc)
+    button.addEventListener("click", () => {
+      promptEl.value = `/${command.name} `
+      slashEl.hidden = true
+      promptEl.focus()
+    })
+    slashEl.append(button)
+  })
+}
+
 async function refreshSessions() {
   const body = await api("/api/sessions").then((r) => r.json())
   sessions = body.sessions ?? []
@@ -113,7 +178,7 @@ async function openSession(id) {
   titleEl.textContent = current.title || "Untitled"
   metaEl.textContent = current.id
   transcriptEl.replaceChildren()
-  for (const event of body.events ?? []) renderEvent(event)
+  for (const event of body.events ?? []) renderEvent(event, false)
   renderSessions()
 }
 
@@ -144,16 +209,20 @@ async function consumeTurn(response) {
     for (const chunk of chunks) {
       const line = chunk.split("\n").find((part) => part.startsWith("data:"))
       if (!line) continue
-      renderEvent(JSON.parse(line.slice(5).trim()))
+      renderEvent(JSON.parse(line.slice(5).trim()), true)
     }
   }
 }
 
 async function showApp() {
-  const settings = await api("/api/settings").then((r) => r.json())
+  const [settings, commandBody] = await Promise.all([
+    api("/api/settings").then((r) => r.json()),
+    api("/api/commands").then((r) => r.json()),
+  ])
   permissionEl.value = settings.permission || "workspace-write"
   hintEl.textContent = settings.model || ""
   emailEl.textContent = me.email
+  commands = commandBody.commands ?? []
   loginEl.hidden = true
   appEl.hidden = false
   await refreshSessions()
@@ -201,11 +270,45 @@ document.querySelector("#cancel-btn").addEventListener("click", async () => {
   await api(`/api/sessions/${current.id}/cancel`, { method: "POST", body: "{}" })
 })
 
+document.querySelector("#compact-btn").addEventListener("click", async () => {
+  if (!current) return
+  const body = await api(`/api/sessions/${current.id}/command`, {
+    method: "POST",
+    body: JSON.stringify({ command: "/compact" }),
+  }).then((r) => r.json())
+  card("tool", body.result || "compacted")
+})
+
 permissionEl.addEventListener("change", async () => {
   await api("/api/settings", {
     method: "PUT",
     body: JSON.stringify({ permission: permissionEl.value }),
   })
+})
+
+promptEl.addEventListener("input", () => {
+  slashIndex = 0
+  renderSlash()
+})
+
+promptEl.addEventListener("keydown", (event) => {
+  if (slashEl.hidden) return
+  const hits = matchedCommands()
+  if (event.key === "ArrowDown") {
+    event.preventDefault()
+    slashIndex = (slashIndex + 1) % hits.length
+    renderSlash()
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault()
+    slashIndex = (slashIndex - 1 + hits.length) % hits.length
+    renderSlash()
+  } else if (event.key === "Tab" && hits[slashIndex]) {
+    event.preventDefault()
+    promptEl.value = `/${hits[slashIndex].name} `
+    slashEl.hidden = true
+  } else if (event.key === "Escape") {
+    slashEl.hidden = true
+  }
 })
 
 document.querySelector("#composer").addEventListener("submit", async (event) => {
@@ -214,6 +317,7 @@ document.querySelector("#composer").addEventListener("submit", async (event) => 
   const message = promptEl.value.trim()
   if (!message) return
   sending = true
+  slashEl.hidden = true
   try {
     const session = await ensureSession()
     if (session.title === "Untitled") titleEl.textContent = message.slice(0, 72)
