@@ -23,8 +23,9 @@ upstream seams so they can run in a Durable Object.
 browser
   │  Access JWT or access-key cookie
   ▼
-Worker          entry + auth + binding fan-out; /api/* → Durable Object
-  │
+Worker          entry + auth + binding fan-out
+  │             /answer → ControlMailbox ("owner")
+  │             /cancel and other /api → HarnessObject ("owner")
   ▼
 HarnessObject   Durable Object + SQLite
   │  compose() once per isolate lifetime
@@ -38,6 +39,7 @@ HarnessObject   Durable Object + SQLite
   ├─ systemPrompt sections + skills + time + briefing
   ├─ commands + compaction (/compact)
   ├─ schedule (Durable Object alarms)
+  ├─ questions → ControlMailbox ask / answer / abort
   └─ agent-loop (deriveMessages, cancel)
 ```
 
@@ -60,10 +62,31 @@ Objects, Containers, and R2 cannot bind each other.
 | The GUI is static, so the Worker is optional | Assets can serve `public/` without invoking the Worker. `/api/*`, login, and bindings still need the script. |
 | The Durable Object holds state, so the Worker is redundant | DO classes are exported from the Worker module and bound in `wrangler.jsonc`. |
 
-The Worker is entry + auth + binding fan-out. It is not the agent loop, not
-session SQLite, and not Linux. Those stay on `HarnessObject` and the Sandbox
-container. Official `dsh-web-frontend`, Typert, and Node `dsh web` are
+The Worker is entry + auth + binding fan-out. `POST /api/sessions/:id/answer`
+goes to ControlMailbox; `POST /api/sessions/:id/cancel` and the rest of
+`/api` go to HarnessObject (`idFromName("owner")`). It is not the agent loop,
+not session SQLite, and not Linux. Those stay on `HarnessObject` and the
+Sandbox container. Official `dsh-web-frontend`, Typert, and Node `dsh web` are
 rejected; the GUI is the Workers Assets SPA.
+
+## Ask-user mailbox
+
+`ask_user_question` and permission Allow/Deny wait on a **ControlMailbox**
+Durable Object, not on HarnessObject. Waiters are in-memory Promises keyed by
+session id and question id. RPC arguments are strings and numbers only.
+
+| Method | Role |
+|---|---|
+| `ask(sessionId, id, timeoutMs)` | Park until answer, abort, or timeout |
+| `answer(sessionId, id, text)` | Resolve the waiter; `false` if none |
+| `abort(sessionId, id)` | Reject with `ask_user_question cancelled`; `false` if none |
+
+The mailbox is named `"owner"`, same as HarnessObject. AbortSignal stays in
+the harness isolate: `QuestionService` listens to the turn signal and calls
+`abort(sessionId, id)`. Do not pass AbortSignal over Durable Object RPC.
+
+`POST /api/sessions/:id/cancel` stays on HarnessObject (`agentLoop.cancel`).
+The `QUESTIONS` / `QuestionGate` binding is kept until a later tombstone.
 
 ## What we keep from DeepSeek Harness
 
@@ -88,7 +111,7 @@ rejected; the GUI is the Workers Assets SPA.
 | Todo | `todo_write` | Session log `todo/write` |
 | Schedule tools | `schedule_*` | DO alarms |
 | Plan | `dsh-plan-mode` | `/plan` + `exit_plan_mode` |
-| Ask user | `ask_user_question` | QuestionGate DO (avoids DO queue deadlock) |
+| Ask user | `ask_user_question` | ControlMailbox `ask` / `answer` / `abort` |
 
 ## What we do not port
 

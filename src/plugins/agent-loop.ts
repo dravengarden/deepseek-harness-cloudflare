@@ -29,7 +29,9 @@ export class AgentLoop extends Service {
     const onAbort = () => local.abort()
     signal?.addEventListener("abort", onAbort)
     const previousSession = this.ctx.tools.sessionId
+    const previousSignal = this.ctx.tools.signal
     this.ctx.tools.sessionId = sessionId
+    this.ctx.tools.signal = local.signal
 
     const emit = (type: string, payload: unknown) => {
       const event = session.append(type, payload)
@@ -101,7 +103,9 @@ export class AgentLoop extends Service {
     } finally {
       stopForward()
       this.ctx.tools.sessionId = previousSession
+      this.ctx.tools.signal = previousSignal
       signal?.removeEventListener("abort", onAbort)
+      local.abort()
       this.inflight.delete(sessionId)
     }
   }

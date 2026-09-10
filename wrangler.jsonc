@@ -29,6 +29,10 @@
       {
         "name": "QUESTIONS",
         "class_name": "QuestionGate"
+      },
+      {
+        "name": "MAILBOX",
+        "class_name": "ControlMailbox"
       }
     ]
   },
@@ -44,6 +48,10 @@
     {
       "tag": "v3",
       "new_sqlite_classes": ["QuestionGate"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["ControlMailbox"]
     }
   ],
   "vars": {

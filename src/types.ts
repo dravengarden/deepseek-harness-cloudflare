@@ -1,10 +1,11 @@
-import type { QuestionGate } from "./gate.ts"
+import type { ControlMailbox } from "./mailbox.ts"
 import type { Sandbox } from "./sandbox.ts"
 
 export interface Env {
   HARNESS: DurableObjectNamespace
   Sandbox: DurableObjectNamespace<Sandbox>
-  QUESTIONS: DurableObjectNamespace<QuestionGate>
+  MAILBOX: DurableObjectNamespace<ControlMailbox>
+  QUESTIONS: DurableObjectNamespace // keep until v5
   ASSETS: Fetcher
   BACKUP_BUCKET: R2Bucket
   DEEPSEEK_API_KEY: string

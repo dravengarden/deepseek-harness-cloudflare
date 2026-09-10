@@ -34,7 +34,7 @@ export function apply(ctx: Context): void {
       const id = randomId("ask")
       session.append("ask/question", { id, question, options })
       try {
-        const answer = await ctx.questions.ask(sessionId, id, TIMEOUT_MS)
+        const answer = await ctx.questions.ask(sessionId, id, TIMEOUT_MS, ctx.tools.signal)
         session.append("ask/answer", { id, answer })
         return answer
       } catch (error) {

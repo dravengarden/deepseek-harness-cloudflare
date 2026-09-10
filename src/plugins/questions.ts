@@ -13,8 +13,19 @@ export class QuestionService extends Service {
     super(ctx, "questions")
   }
 
-  async ask(sessionId: string, id: string, timeoutMs: number): Promise<string> {
-    const stub = this.config.env.QUESTIONS.get(this.config.env.QUESTIONS.idFromName(sessionId))
-    return stub.ask(id, timeoutMs)
+  async ask(sessionId: string, id: string, timeoutMs: number, signal?: AbortSignal): Promise<string> {
+    const stub = this.config.env.MAILBOX.getByName("owner")
+    if (signal?.aborted) {
+      await stub.abort(sessionId, id)
+      throw new Error("ask_user_question cancelled")
+    }
+    const onAbort = () => { void stub.abort(sessionId, id) }
+    signal?.addEventListener("abort", onAbort)
+    try {
+      return await stub.ask(sessionId, id, timeoutMs)
+    } finally {
+      signal?.removeEventListener("abort", onAbort)
+      await stub.abort(sessionId, id)
+    }
   }
 }

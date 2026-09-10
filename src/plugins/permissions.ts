@@ -51,7 +51,7 @@ export class PermissionService extends Service {
     const id = randomId("ask")
     const question = `Allow tool \`${name}\`?\n${JSON.stringify(args).slice(0, 500)}`
     session.append("ask/question", { id, question, options: ["Allow", "Deny"] })
-    const answer = await this.ctx.questions.ask(sessionId, id, 5 * 60_000)
+    const answer = await this.ctx.questions.ask(sessionId, id, 5 * 60_000, this.ctx.tools.signal)
     session.append("ask/answer", { id, answer })
     if (answer.trim().toLowerCase() !== "allow") {
       throw new Error("permission denied")

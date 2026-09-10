@@ -8,6 +8,7 @@ import {
 import { HarnessObject } from "./object.ts"
 import type { Env } from "./types.ts"
 
+export { ControlMailbox } from "./mailbox.ts"
 export { QuestionGate } from "./gate.ts"
 export { Sandbox } from "./sandbox.ts"
 
@@ -66,7 +67,7 @@ export default {
         const id = body.id ?? ""
         const answer = body.answer ?? ""
         if (!id || !answer) return Response.json({ error: "id and answer are required" }, { status: 400 })
-        const ok = await env.QUESTIONS.get(env.QUESTIONS.idFromName(answerMatch[1]!)).answer(id, answer)
+        const ok = await env.MAILBOX.getByName("owner").answer(answerMatch[1]!, id, answer)
         return Response.json({ ok })
       }
       const id = env.HARNESS.idFromName("owner")

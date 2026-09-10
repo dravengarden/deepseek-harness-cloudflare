@@ -4,6 +4,7 @@ import type { ToolDefinition } from "../types.ts"
 export class ToolService extends Service {
   readonly definitions = new Map<string, ToolDefinition>()
   sessionId: string | undefined
+  signal?: AbortSignal
 
   constructor(ctx: Context) {
     super(ctx, "tools")
