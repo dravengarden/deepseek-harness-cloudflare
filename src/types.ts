@@ -5,7 +5,7 @@ export interface Env {
   HARNESS: DurableObjectNamespace
   Sandbox: DurableObjectNamespace<Sandbox>
   MAILBOX: DurableObjectNamespace<ControlMailbox>
-  QUESTIONS: DurableObjectNamespace // keep until v5
+  QUESTIONS: DurableObjectNamespace // required while QuestionGate is bound
   ASSETS: Fetcher
   BACKUP_BUCKET: R2Bucket
   DEEPSEEK_API_KEY: string

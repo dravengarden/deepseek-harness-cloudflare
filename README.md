@@ -39,8 +39,7 @@ HarnessObject          Durable Object + SQLite
   ├─ schedule                    Durable Object alarms
   └─ agent-loop                  deriveMessages → stream → tools → turn/end
 
-QuestionGate           separate DO so ask-user / approvals are not queued
-                       behind the paused turn
+ControlMailbox         ask / answer / abort waiters (named "owner")
 Sandbox                official @cloudflare/sandbox container
                        sleepAfter 10m, backup /workspace to R2 on idle
 ```

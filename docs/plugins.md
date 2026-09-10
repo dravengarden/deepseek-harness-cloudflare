@@ -64,7 +64,7 @@ export function apply(ctx: Context) {
 | `ctx.compaction` | `/compact` and `compactNow` |
 | `ctx.execution` | official Sandbox: bash, `/workspace` files, backup/restore |
 | `ctx.subagents` | in-process spawn/fork child sessions |
-| `ctx.questions` | `ask_user_question` wait (separate QuestionGate DO) |
+| `ctx.questions` | `ask_user_question` wait (ControlMailbox ask / answer / abort) |
 | `ctx.plan` | plan mode + `exit_plan_mode` |
 
 Do not import Node APIs. Do not mount the official YAML Loader. The kernel is

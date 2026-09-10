@@ -28,6 +28,7 @@ export class AgentLoop extends Service {
     this.inflight.set(sessionId, local)
     const onAbort = () => local.abort()
     signal?.addEventListener("abort", onAbort)
+    if (signal?.aborted) local.abort()
     const previousSession = this.ctx.tools.sessionId
     const previousSignal = this.ctx.tools.signal
     this.ctx.tools.sessionId = sessionId
@@ -88,6 +89,7 @@ export class AgentLoop extends Service {
 
         emit("assistant/message", { content: text || null, tool_calls: toolCalls })
         for (const call of toolCalls) {
+          if (local.signal.aborted) break
           const result = await this.ctx.tools.execute(
             call.function.name,
             call.function.arguments,
