@@ -6,11 +6,11 @@ import {
   resolveIdentity,
 } from "./auth.ts"
 import { identityErrorResponse, identityKey, identityMode } from "./identity.ts"
+import { log } from "./lib/log.ts"
 import { HarnessObject } from "./object.ts"
 import type { Env } from "./types.ts"
 
 export { ControlMailbox } from "./mailbox.ts"
-export { QuestionGate } from "./gate.ts"
 export { Sandbox } from "./sandbox.ts"
 
 export { composeHarness } from "./compose.ts"
@@ -30,6 +30,7 @@ export default {
       const body = await request.json().catch(() => ({})) as { accessKey?: string }
       const key = body.accessKey ?? ""
       if (!(await accessKeyMatches(env, key))) {
+        log({ level: "error", msg: "unauthorized", route: url.pathname, err: "invalid access key" })
         return Response.json({ error: "invalid access key" }, { status: 401 })
       }
       return Response.json(
@@ -51,6 +52,7 @@ export default {
     if (url.pathname.startsWith("/api/")) {
       const identity = await resolveIdentity(request, env)
       if (!identity) {
+        log({ level: "error", msg: "unauthorized", route: url.pathname, err: "no jwt / bad key" })
         return Response.json({ error: "unauthorized" }, { status: 401 })
       }
       let key: string
@@ -60,6 +62,15 @@ export default {
         const forbidden = identityErrorResponse(error)
         if (forbidden) return forbidden
         throw error
+      }
+      if (key.startsWith("user:")) {
+        log({
+          level: "info",
+          msg: "identity route",
+          identityKey: key,
+          route: url.pathname,
+          mode: "per-user",
+        })
       }
       if (url.pathname === "/api/me") {
         return Response.json({

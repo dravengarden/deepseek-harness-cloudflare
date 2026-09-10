@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers"
+import { log } from "./lib/log.ts"
 
 type Waiter = {
   resolve: (text: string) => void
@@ -56,7 +57,25 @@ export class ControlMailbox extends DurableObject {
   private readonly waiters = new MailboxWaiters()
 
   async ask(sessionId: string, id: string, timeoutMs: number): Promise<string> {
-    return this.waiters.ask(sessionId, id, timeoutMs)
+    const identityKey = this.ctx.id.name ?? "owner"
+    const started = Date.now()
+    try {
+      return await this.waiters.ask(sessionId, id, timeoutMs)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes("timed out") || message.includes("cancelled")) {
+        log({
+          level: message.includes("timed out") ? "error" : "info",
+          msg: message.includes("timed out") ? "ask timeout" : "ask cancelled",
+          identityKey,
+          sessionId,
+          doClass: "ControlMailbox",
+          elapsedMs: Date.now() - started,
+          err: error,
+        })
+      }
+      throw error
+    }
   }
 
   async answer(sessionId: string, id: string, text: string): Promise<boolean> {

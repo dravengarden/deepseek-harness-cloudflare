@@ -261,6 +261,39 @@ key. After they are set, `/api/login` is disabled.
   as disposable.
 - Container `max_instances` is **5**: concurrent *running* containers, not
   registered users. Sleeping sandboxes do not count.
+- To roll back per-user: unset `IDENTITY_MODE` (or set `shared-owner`) and
+  redeploy. Routing returns to `"owner"`. `user:*` objects hibernate unused;
+  owner SQLite is unchanged. Sessions created under `user:<sub>` while
+  per-user was on are not copied back.
+
+## Operations
+
+### Logs
+
+```bash
+npx wrangler tail
+```
+
+Worker, HarnessObject, ControlMailbox, and Sandbox emit one JSON line per
+event with `level`, `msg`, `identityKey`, `sessionId`, `route`, `doClass`,
+`elapsedMs`, and `err`. They never log `Cf-Access-Jwt-Assertion`, access
+keys, or `DEEPSEEK_API_KEY`. Tool results are truncated.
+
+Lines worth grepping: Worker 401, `composeHarness after hibernation`, turn
+start/end/cancel, ask timeout/cancelled, sandbox restore hit/miss, backup
+success/fail, sandbox capacity, schedule alarm, identity route to a
+`user:` key (`mode=per-user`).
+
+Cloudflare Workers request/CPU/error metrics plus the Containers dashboard
+are enough. This host does not write Workers Analytics Engine.
+
+### Containers vs `max_instances`
+
+`max_instances` (5) is concurrent *running* containers, not registered
+users. Sleeping sandboxes do not consume a slot. If the dashboard instance
+count is stuck at 5, new Linux tools fail with the capacity error until
+another workspace sleeps. Raising the cap is safe; lowering it below
+currently-running instances can fail new starts — raise or wait.
 
 ## Develop a plugin
 

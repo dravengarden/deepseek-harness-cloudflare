@@ -1,5 +1,6 @@
 import { BackupExpiredError, BackupNotFoundError, getSandbox } from "@cloudflare/sandbox"
 import { Service, type Context } from "@deepseek-ai/cordis"
+import { log } from "../lib/log.ts"
 import { isSandboxCapacityError, SANDBOX_CAPACITY_MESSAGE } from "../lib/sandbox-capacity.ts"
 import { WORKSPACE_MARKER, WORKSPACE_ROOT, resolveWorkspacePath, workspaceParent } from "../lib/workspace-path.ts"
 import type { Sandbox } from "../sandbox.ts"
@@ -128,11 +129,31 @@ export class ExecutionService extends Service {
       if (handle && !marker.exists) {
         try {
           await sandbox.restoreBackup(handle)
+          log({
+            level: "info",
+            msg: "sandbox restore hit",
+            identityKey: this.config.identityKey,
+            doClass: "Sandbox",
+          })
         } catch (error) {
           if (!(error instanceof BackupExpiredError || error instanceof BackupNotFoundError)) {
             throw error
           }
+          log({
+            level: "info",
+            msg: "sandbox restore miss",
+            identityKey: this.config.identityKey,
+            doClass: "Sandbox",
+            err: error,
+          })
         }
+      } else if (!handle && !marker.exists) {
+        log({
+          level: "info",
+          msg: "sandbox restore miss",
+          identityKey: this.config.identityKey,
+          doClass: "Sandbox",
+        })
       }
       const root = await sandbox.exists(WORKSPACE_ROOT)
       if (!root.exists) await sandbox.mkdir(WORKSPACE_ROOT, { recursive: true })
@@ -147,7 +168,13 @@ export class ExecutionService extends Service {
   private failCapacity(error: unknown): never {
     if (error instanceof Error && error.message === SANDBOX_CAPACITY_MESSAGE) throw error
     if (isSandboxCapacityError(error)) {
-      console.warn("sandbox capacity reached (max_instances)", this.config.identityKey)
+      log({
+        level: "error",
+        msg: "sandbox capacity",
+        identityKey: this.config.identityKey,
+        doClass: "Sandbox",
+        err: SANDBOX_CAPACITY_MESSAGE,
+      })
       throw new Error(SANDBOX_CAPACITY_MESSAGE)
     }
     throw error

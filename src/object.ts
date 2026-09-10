@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers"
 import type { Context } from "@deepseek-ai/cordis"
 import { composeHarness } from "./compose.ts"
+import { log } from "./lib/log.ts"
 import { sseStream } from "./lib/sse.ts"
 import type { SqlStorage } from "./sql.ts"
 import type { Env } from "./types.ts"
@@ -8,29 +9,54 @@ import type { Env } from "./types.ts"
 export class HarnessObject extends DurableObject<Env> {
   private harness: Context | undefined
 
+  private identityKey(): string {
+    return this.ctx.id.name ?? "owner"
+  }
+
   private async context(): Promise<Context> {
-    const identityKey = this.ctx.id.name ?? "owner"
+    const identityKey = this.identityKey()
     const existing = this.harness
     if (existing) return existing
     const composed = await this.ctx.blockConcurrencyWhile(async () => {
-      return this.harness ?? await composeHarness(this.env, this.ctx.storage.sql as SqlStorage, {
+      if (this.harness) return this.harness
+      const started = Date.now()
+      const next = await composeHarness(this.env, this.ctx.storage.sql as SqlStorage, {
         identityKey,
         armAlarm: (at) => {
           void this.ctx.storage.setAlarm(at)
         },
       })
+      log({
+        level: "info",
+        msg: "composeHarness after hibernation",
+        identityKey,
+        doClass: "HarnessObject",
+        elapsedMs: Date.now() - started,
+      })
+      return next
     })
     this.harness = composed
     return composed
   }
 
   async alarm(): Promise<void> {
+    const identityKey = this.identityKey()
+    const started = Date.now()
     const ctx = await this.context()
-    await ctx.schedule.fireDue(Date.now())
+    const due = await ctx.schedule.fireDue(Date.now())
+    log({
+      level: "info",
+      msg: "schedule alarm fire",
+      identityKey,
+      sessionId: due[0]?.sessionId,
+      doClass: "HarnessObject",
+      elapsedMs: Date.now() - started,
+    })
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
+    const identityKey = this.identityKey()
     const ctx = await this.context()
     const { sessions, agentLoop, commands } = ctx
 
@@ -84,7 +110,16 @@ export class HarnessObject extends DurableObject<Env> {
 
     const cancelMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/cancel$/)
     if (request.method === "POST" && cancelMatch) {
-      agentLoop.cancel(cancelMatch[1]!)
+      const sessionId = cancelMatch[1]!
+      agentLoop.cancel(sessionId)
+      log({
+        level: "info",
+        msg: "turn cancel",
+        identityKey,
+        sessionId,
+        route: url.pathname,
+        doClass: "HarnessObject",
+      })
       return Response.json({ ok: true })
     }
 
@@ -116,12 +151,7 @@ export class HarnessObject extends DurableObject<Env> {
             const result = await commands.run(message, session.id)
             const rest = message.slice(name.length + 1).trim()
             if (name === "plan" && rest && rest !== "off") {
-              const stream = sseStream(async (send) => {
-                await agentLoop.run(session.id, rest, send)
-              })
-              return new Response(stream, {
-                headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
-              })
+              return turnStream(identityKey, session.id, url.pathname, (send) => agentLoop.run(session.id, rest, send))
             }
             return Response.json({ result })
           } catch (error) {
@@ -129,15 +159,7 @@ export class HarnessObject extends DurableObject<Env> {
           }
         }
       }
-      const stream = sseStream(async (send) => {
-        await agentLoop.run(session.id, message, send)
-      })
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-        },
-      })
+      return turnStream(identityKey, session.id, url.pathname, (send) => agentLoop.run(session.id, message, send))
     }
 
     return jsonError("not found", 404)
@@ -154,4 +176,43 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
 
 function jsonError(message: string, status: number): Response {
   return Response.json({ error: message }, { status })
+}
+
+function turnStream(
+  identityKey: string,
+  sessionId: string,
+  route: string,
+  run: (send: (event: unknown) => void) => Promise<void>,
+): Response {
+  const stream = sseStream(async (send) => {
+    const started = Date.now()
+    log({ level: "info", msg: "turn start", identityKey, sessionId, route, doClass: "HarnessObject" })
+    try {
+      await run(send)
+      log({
+        level: "info",
+        msg: "turn end",
+        identityKey,
+        sessionId,
+        route,
+        doClass: "HarnessObject",
+        elapsedMs: Date.now() - started,
+      })
+    } catch (error) {
+      log({
+        level: "error",
+        msg: "turn end",
+        identityKey,
+        sessionId,
+        route,
+        doClass: "HarnessObject",
+        elapsedMs: Date.now() - started,
+        err: error,
+      })
+      throw error
+    }
+  })
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+  })
 }

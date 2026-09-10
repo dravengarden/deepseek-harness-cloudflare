@@ -1,4 +1,5 @@
 import { Sandbox as CloudflareSandbox, type DirectoryBackup } from "@cloudflare/sandbox"
+import { log } from "./lib/log.ts"
 import { WORKSPACE_ROOT } from "./lib/workspace-path.ts"
 
 const HANDLE_KEY = "workspace_backup"
@@ -19,10 +20,26 @@ export class Sandbox extends CloudflareSandbox<SandboxEnv> {
   sleepAfter = "10m"
 
   async onActivityExpired(): Promise<void> {
+    const identityKey = this.ctx.id.name ?? "owner"
+    const started = Date.now()
     try {
       await this.persistWorkspace()
-    } catch {
-      // Still sleep; live disk is about to go away either way.
+      log({
+        level: "info",
+        msg: "sandbox backup success",
+        identityKey,
+        doClass: "Sandbox",
+        elapsedMs: Date.now() - started,
+      })
+    } catch (error) {
+      log({
+        level: "error",
+        msg: "sandbox backup fail",
+        identityKey,
+        doClass: "Sandbox",
+        elapsedMs: Date.now() - started,
+        err: error,
+      })
     }
     await super.onActivityExpired()
   }
