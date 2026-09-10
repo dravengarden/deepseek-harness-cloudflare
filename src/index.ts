@@ -5,7 +5,7 @@ import {
   cookieHeader,
   resolveIdentity,
 } from "./auth.ts"
-import { identityErrorResponse, identityKey } from "./identity.ts"
+import { identityErrorResponse, identityKey, identityMode } from "./identity.ts"
 import { HarnessObject } from "./object.ts"
 import type { Env } from "./types.ts"
 
@@ -53,15 +53,6 @@ export default {
       if (!identity) {
         return Response.json({ error: "unauthorized" }, { status: 401 })
       }
-      if (url.pathname === "/api/me") {
-        return Response.json({
-          ok: true,
-          model: env.DEEPSEEK_MODEL || "deepseek-v4-flash",
-          email: identity.email,
-          auth: identity.source,
-          ...(identity.sub ? { sub: identity.sub } : {}),
-        })
-      }
       let key: string
       try {
         key = identityKey(identity, env)
@@ -69,6 +60,17 @@ export default {
         const forbidden = identityErrorResponse(error)
         if (forbidden) return forbidden
         throw error
+      }
+      if (url.pathname === "/api/me") {
+        return Response.json({
+          ok: true,
+          model: env.DEEPSEEK_MODEL || "deepseek-v4-flash",
+          email: identity.email,
+          auth: identity.source,
+          identityKey: key,
+          identityMode: identityMode(env),
+          ...(identity.sub ? { sub: identity.sub } : {}),
+        })
       }
       const mailbox = env.MAILBOX.getByName(key)
       const harness = env.HARNESS.getByName(key)

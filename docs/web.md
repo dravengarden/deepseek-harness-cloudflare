@@ -30,13 +30,39 @@ The Worker routes with `getByName(identityKey())`. Access decides *who may
 use* the app. The architecture target is one HarnessObject and one Sandbox
 per Access identity. The ship default is `IDENTITY_MODE` unset =
 `shared-owner` (`"owner"`), so production is not per-user until an operator
-flips. `/api/me` may include Access `sub` when present.
+flips.
+
+Local `/api/login` (access-key cookie), Cloudflare Access, and `/api/logout`
+are unchanged. There is no Typert RPC plane and no tenant picker.
 
 ### Local: access key
 
 If `TEAM_DOMAIN` / `POLICY_AUD` are unset, `/api/login` accepts
 `DSH_CF_ACCESS_KEY` and sets an HttpOnly cookie. That path is for
 `wrangler dev` only.
+
+### `GET /api/me`
+
+Worker-only JSON (not a Durable Object). After JWT or access-key
+verification it returns `{ ok, model, email, auth, identityKey, identityMode }`
+and `sub` when the Access JWT has one. `LOCAL_DEV` does not gate these fields.
+
+| Field | Meaning |
+|---|---|
+| `ok` | `true` |
+| `model` | `DEEPSEEK_MODEL` or `deepseek-v4-flash` |
+| `email` | Display only. Never a tenant id. |
+| `auth` | `"access"` or `"key"` |
+| `identityKey` | Durable Object name from `identityKey()`: `owner`, `local`, or `user:<sub>` |
+| `identityMode` | `"per-user"` only when `IDENTITY_MODE=per-user`; otherwise `"shared-owner"` (including unset) |
+| `sub` | Access subject, included when present |
+
+If `identityKey()` throws `IdentityError` (Access JWT missing `sub` in
+`per-user` mode), `/api/me` is 403 like other `/api` routes.
+
+The SPA shows `email` in the top bar and may show `identityKey` in the
+composer hint. It does not send `identityKey` back or offer a tenant
+picker. Cancel stays `POST /api/sessions/:id/cancel`.
 
 ## Permissions
 
@@ -71,6 +97,7 @@ The SPA mirrors the official web *surface*, not the Node app:
 - Tool calls, todos, ask-user prompts
 - Slash-command menu from `/api/commands`
 - Permission preset in the top bar
+- Email in the top bar (display only; not a tenant id)
 
 History replay uses settled events only (`assistant/message`, tools), not
 live `assistant/chunk` rows, so reopening a session does not duplicate

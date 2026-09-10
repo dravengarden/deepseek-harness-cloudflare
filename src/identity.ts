@@ -6,6 +6,10 @@ export type Identity = {
   source: "access" | "key"
 }
 
+export function identityMode(env: Env): "per-user" | "shared-owner" {
+  return env.IDENTITY_MODE === "per-user" ? "per-user" : "shared-owner"
+}
+
 export function identityKey(identity: Identity, env: Env): string {
   // Only exact "per-user" splits objects. Typos must not leave "owner".
   if (env.IDENTITY_MODE !== "per-user") return "owner"

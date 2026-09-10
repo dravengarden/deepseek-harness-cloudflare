@@ -222,7 +222,7 @@ async function showApp() {
     api("/api/commands").then((r) => r.json()),
   ])
   permissionEl.value = settings.permission || "workspace-write"
-  hintEl.textContent = settings.model || ""
+  hintEl.textContent = [settings.model, me.identityKey].filter(Boolean).join(" · ")
   emailEl.textContent = me.email
   commands = commandBody.commands ?? []
   loginEl.hidden = true

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { IdentityError, identityErrorResponse, identityKey, type Identity } from "../src/identity.ts"
+import { IdentityError, identityErrorResponse, identityKey, identityMode, type Identity } from "../src/identity.ts"
 import type { Env } from "../src/types.ts"
 
 function env(partial: {
@@ -21,6 +21,15 @@ const accessKey: Identity = {
   email: "owner",
   source: "key",
 }
+
+test("identityMode is per-user only for exact IDENTITY_MODE=per-user", () => {
+  assert.equal(identityMode(env()), "shared-owner")
+  assert.equal(identityMode(env({ IDENTITY_MODE: "shared-owner" })), "shared-owner")
+  assert.equal(identityMode(env({ IDENTITY_MODE: "per-user" })), "per-user")
+  for (const mode of ["Per-User", "per_user", "peruser", "typo"]) {
+    assert.equal(identityMode(env({ IDENTITY_MODE: mode })), "shared-owner")
+  }
+})
 
 test("unset IDENTITY_MODE is owner for Access and access-key", () => {
   assert.equal(identityKey(access, env()), "owner")

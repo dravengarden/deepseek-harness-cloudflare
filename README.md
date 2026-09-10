@@ -62,7 +62,15 @@ wired, but production still shares `"owner"` until an operator flips to
 
 The GUI is the Workers Assets SPA in `public/`. Official
 `dsh-web-frontend`, Typert, and Node `dsh web` are rejected — they need a
-Node host plane this runtime does not have.
+Node host plane this runtime does not have. There is no Typert RPC
+(`/api/remote.mux`). Local `/api/login`, Cloudflare Access, and `/api/logout`
+are unchanged.
+
+`GET /api/me` returns `{ ok, model, email, auth, identityKey, identityMode }`
+and `sub` when the Access JWT has one. `identityKey` is the Durable Object
+name (`owner` / `local` / `user:<sub>`). `identityMode` is `"per-user"` only
+when `IDENTITY_MODE=per-user`; otherwise `"shared-owner"` (unset is not
+per-user). Email is display-only; the SPA must not treat it as a tenant id.
 
 Hibernation drops the in-memory plugin tree. The next request composes again
 and rebuilds model history from the append-only `events` table. Container
