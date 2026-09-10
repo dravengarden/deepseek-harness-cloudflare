@@ -4,7 +4,7 @@ import { IdentityError, identityErrorResponse, identityKey, type Identity } from
 import type { Env } from "../src/types.ts"
 
 function env(partial: {
-  IDENTITY_MODE?: Env["IDENTITY_MODE"]
+  IDENTITY_MODE?: string
   LEGACY_OWNER_EMAIL?: string
   LEGACY_OWNER_SUB?: string
 } = {}): Env {
@@ -31,6 +31,13 @@ test("IDENTITY_MODE=shared-owner is owner", () => {
   const shared = env({ IDENTITY_MODE: "shared-owner" })
   assert.equal(identityKey(access, shared), "owner")
   assert.equal(identityKey(accessKey, shared), "owner")
+})
+
+test("unknown IDENTITY_MODE stays owner", () => {
+  for (const mode of ["Per-User", "per_user", "peruser", "typo"]) {
+    assert.equal(identityKey(access, env({ IDENTITY_MODE: mode })), "owner")
+    assert.equal(identityKey(accessKey, env({ IDENTITY_MODE: mode })), "owner")
+  }
 })
 
 test("IDENTITY_MODE=per-user + Access + sub is user:<sub>", () => {

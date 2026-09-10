@@ -89,7 +89,8 @@ listens to the turn signal and calls `abort(sessionId, id)`. Do not pass
 AbortSignal over Durable Object RPC.
 
 `POST /api/sessions/:id/cancel` stays on HarnessObject (`agentLoop.cancel`).
-The `QUESTIONS` / `QuestionGate` binding is kept until a later tombstone.
+The `QUESTIONS` / `QuestionGate` binding stays declared; `QuestionGate` is a
+no-op class still listed in the SQLite migration chain.
 
 ## What we keep from DeepSeek Harness
 

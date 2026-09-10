@@ -7,8 +7,8 @@ export type Identity = {
 }
 
 export function identityKey(identity: Identity, env: Env): string {
-  // Unset / shared-owner always maps to "owner".
-  if (!env.IDENTITY_MODE || env.IDENTITY_MODE === "shared-owner") return "owner"
+  // Only exact "per-user" splits objects. Typos must not leave "owner".
+  if (env.IDENTITY_MODE !== "per-user") return "owner"
   if (identity.source === "key") return "local"
   if (env.LEGACY_OWNER_SUB && identity.sub === env.LEGACY_OWNER_SUB) return "owner"
   if (env.LEGACY_OWNER_EMAIL && identity.email.toLowerCase() === env.LEGACY_OWNER_EMAIL.toLowerCase()) {
