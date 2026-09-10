@@ -111,7 +111,7 @@ process. They are **not** in this repository. Full table:
 | Workflow / ralph / `run_code` PTC | Worker threads / `node:vm` |
 | Dynamic `cordis_*` plugins | Untrusted package load |
 | PowerShell, vision / `read_image`, agent teams, goals | Not on this runtime |
-| Per-user HarnessObject + Sandbox (`IDENTITY_MODE=per-user`) | Helper exists (`identityKey()`); routing is still `idFromName("owner")` until an operator flip |
+| Per-user HarnessObject + Sandbox (`IDENTITY_MODE=per-user`) | Helper exists (`identityKey()`); routing is still `idFromName("owner")` and is not wired yet |
 
 Do not expect `npx @deepseek-ai/dsh web` plugins to `dsh plugin add` onto this
 Worker. Third-party plugins must be Cordis modules mounted from

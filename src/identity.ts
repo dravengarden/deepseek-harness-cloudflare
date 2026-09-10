@@ -7,7 +7,7 @@ export type Identity = {
 }
 
 export function identityKey(identity: Identity, env: Env): string {
-  // Safe default: keep existing owner SQLite until the operator opts in.
+  // Unset / shared-owner always maps to "owner".
   if (!env.IDENTITY_MODE || env.IDENTITY_MODE === "shared-owner") return "owner"
   if (identity.source === "key") return "local"
   if (env.LEGACY_OWNER_SUB && identity.sub === env.LEGACY_OWNER_SUB) return "owner"

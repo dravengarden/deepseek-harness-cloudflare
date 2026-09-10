@@ -11,9 +11,10 @@ not the agent loop. GUI is the Workers Assets SPA; do not host official
 `dsh-web-frontend`, Typert, or Node `dsh web`.
 
 Routing is `idFromName("owner")`. `identityKey()` is the per-user helper;
-`IDENTITY_MODE` unset = shared-owner. Do not change routing off `"owner"`
-until the identity PR. Architecture target is one HarnessObject + Sandbox
-per Access identity; do not claim routing is already per-user.
+`IDENTITY_MODE` unset = shared-owner. Do not call `identityKey()` for
+HARNESS / Sandbox / mailbox until identity routing is wired. Architecture
+target is one HarnessObject + Sandbox per Access identity; do not claim
+routing is already per-user.
 
 Linux (bash, `/workspace`) is the official `@cloudflare/sandbox` container,
 not the Durable Object isolate. Sleep with `sleepAfter: "10m"` (no
