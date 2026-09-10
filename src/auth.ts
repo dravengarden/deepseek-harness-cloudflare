@@ -50,6 +50,7 @@ export function clearCookieHeader(secure: boolean): string {
 
 export interface SessionIdentity {
   email: string
+  sub?: string
   source: "access" | "key"
 }
 
@@ -57,7 +58,7 @@ export async function resolveIdentity(request: Request, env: Env): Promise<Sessi
   if (accessConfigured(env)) {
     const identity = await verifyAccessJwt(request, env)
     if (!identity) return null
-    return { email: identity.email, source: "access" }
+    return { email: identity.email, sub: identity.sub, source: "access" }
   }
   const token = readCookie(request)
   if (!token) return null

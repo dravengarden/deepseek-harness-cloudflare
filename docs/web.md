@@ -26,8 +26,12 @@ The browser hits Access login first. The SPA then calls `/api/me` with the
 JWT already on the request. Sign out goes to
 `https://<team>.cloudflareaccess.com/cdn-cgi/access/logout`.
 
-The harness is still **one owner** (`idFromName("owner")`). Access decides
-*who may use* the app; it does not create per-user sandboxes.
+Routing is still **one owner** (`idFromName("owner")`). Access decides
+*who may use* the app. The architecture target is one HarnessObject and one
+Sandbox per Access identity (`identityKey()`); the ship default is
+`IDENTITY_MODE` unset = `shared-owner` so existing owner SQLite is not
+orphaned. This host does not yet route per user. `/api/me` may include
+Access `sub` when present; that value is unused for routing.
 
 ### Local: access key
 
@@ -48,14 +52,15 @@ There is no Unix account model and no `users.yaml`.
 
 ## Official GUI vs this host
 
-`@deepseek-ai/dsh-web-frontend` is the real dsh web client. It boots only after
-the Node host injects `window.__ModuleLoader__` and `window.__DSH_BOOT__`, then
-talks Typert RPC (`/api/remote.mux`, session.create/prompt, …). That host plane
-is not on Workers.
+Official `dsh-web-frontend`, Typert, and Node `dsh web` are **rejected**.
+`@deepseek-ai/dsh-web-frontend` boots only after a Node host injects
+`window.__ModuleLoader__` and `window.__DSH_BOOT__`, then talks Typert RPC
+(`/api/remote.mux`, session.create/prompt, …). That host plane is not on
+Workers. A Typert adapter in the Worker would be a second harness.
 
-This repo therefore ships a **Workbench-shaped SPA** using the official dark
-tokens (`--dsw-*`, DeepSeek wordmark, 56px rail + session sidebar, composer)
-and the official favicon, wired to this host's `/api`. It is not the React
+The GUI is the **Workers Assets SPA** in `public/`: official dark tokens
+(`--dsw-*`, DeepSeek wordmark, 56px rail + session sidebar, composer) and
+the official favicon, wired to this host's `/api`. It is not the React
 slot client.
 
 ## UI

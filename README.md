@@ -23,7 +23,7 @@ marketplace.
 browser
   │  Cloudflare Access (production) or access-key cookie (wrangler dev)
   ▼
-Worker                 auth, static UI, /api/* → one Durable Object
+Worker                 entry + auth + binding fan-out; /api/* → Durable Object
   │
   ▼
 HarnessObject          Durable Object + SQLite
@@ -45,9 +45,24 @@ Sandbox                official @cloudflare/sandbox container
                        sleepAfter 10m, backup /workspace to R2 on idle
 ```
 
-Identity is always `idFromName("owner")`. The browser never picks a Durable
-Object id. Cloudflare Access decides *who may use* the app; it does not
-create one sandbox per user.
+A **Worker script is required**. Access, Assets, Durable Objects, Containers,
+and R2 cannot bind each other. Access is an identity reverse proxy, not an
+application runtime. Assets can serve `public/` without invoking the Worker
+(`run_worker_first` defaults to false); `/api/*` and every binding still
+need the script. Durable Object classes are exported from the Worker module.
+The Worker is entry + auth + binding fan-out, not the agent loop (that lives
+on `HarnessObject`; Linux lives in the Sandbox).
+
+Routing is still `idFromName("owner")`. The browser never picks a Durable
+Object id. The architecture *target* is one HarnessObject and one Sandbox
+per Access identity (`identityKey()` in `src/identity.ts`). The *ship
+default* is `IDENTITY_MODE` unset (`shared-owner`) so existing owner SQLite
+is not orphaned. This host does not yet route per user; flipping to
+`per-user` is an explicit later operator step.
+
+The GUI is the Workers Assets SPA in `public/`. Official
+`dsh-web-frontend`, Typert, and Node `dsh web` are rejected — they need a
+Node host plane this runtime does not have.
 
 Hibernation drops the in-memory plugin tree. The next request composes again
 and rebuilds model history from the append-only `events` table. Container
@@ -56,7 +71,8 @@ disk is ephemeral; `/workspace` is restored from the last Sandbox
 
 More detail: [`docs/architecture.md`](docs/architecture.md),
 [`docs/containers.md`](docs/containers.md), [`docs/web.md`](docs/web.md),
-[`docs/plugins.md`](docs/plugins.md).
+[`docs/plugins.md`](docs/plugins.md),
+[`docs/design-cloudflare-native.md`](docs/design-cloudflare-native.md).
 
 ## What is in this port
 
@@ -73,7 +89,7 @@ More detail: [`docs/architecture.md`](docs/architecture.md),
 | Linux via official Sandbox (`bash`, files, glob/grep/str_replace) | Yes |
 | `/workspace` persistence via `createBackup` on `onActivityExpired` | Yes |
 | Permissions: `workspace-write` (ask) / `danger-full-access` (never ask) | Yes |
-| Web UI: official workbench layout (rail, sessions, chat) on `/api` | Yes (not the Typert React client) |
+| Web UI: Workers Assets SPA (workbench layout on `/api`) | Yes (not `dsh-web-frontend` / Typert / Node `dsh web`) |
 | Plugin host: `composeHarness(env, sql, { plugins })` | Yes |
 
 ## What is not migrated
@@ -84,7 +100,7 @@ process. They are **not** in this repository. Full table:
 
 | Official piece | Why it is absent |
 |---|---|
-| `@deepseek-ai/dsh-web-app` | Node GUI, process-token cookie, Typert RPC. This repo ships a Workers SPA over `/api` instead |
+| `@deepseek-ai/dsh-web-app` / `dsh-web-frontend` / Typert / Node `dsh web` | Node GUI host plane. This repo ships a Workers Assets SPA over `/api` instead |
 | `dsh` CLI, profiles, `dsh plugin add`, HMR | No Node host, no YAML Loader |
 | PTY / `terminal_*` / persistent bash | Sandbox can `exec`, not a product PTY |
 | Landlock / `ctx.sandbox` policy | Isolation is the Cloudflare container |
@@ -95,7 +111,7 @@ process. They are **not** in this repository. Full table:
 | Workflow / ralph / `run_code` PTC | Worker threads / `node:vm` |
 | Dynamic `cordis_*` plugins | Untrusted package load |
 | PowerShell, vision / `read_image`, agent teams, goals | Not on this runtime |
-| Multi-user harness (one DO + sandbox per identity) | Access is a gate in front of a single owner |
+| Per-user HarnessObject + Sandbox (`IDENTITY_MODE=per-user`) | Helper exists (`identityKey()`); routing is still `idFromName("owner")` until an operator flip |
 
 Do not expect `npx @deepseek-ai/dsh web` plugins to `dsh plugin add` onto this
 Worker. Third-party plugins must be Cordis modules mounted from
@@ -219,6 +235,14 @@ key. After they are set, `/api/login` is disabled.
   snapshot per sleep), not on every model turn. `/checkpoint` forces one.
 - Default backup TTL is 7 days. Production restore is a FUSE overlay that
   vanishes on the next sleep and is restored again from the stored handle.
+- `IDENTITY_MODE` unset (or `shared-owner`) keeps the `"owner"` object.
+  `per-user` is the planned split (`user:<sub>`, local access-key →
+  `"local"`) and is **not** wired into routing yet. Optional
+  `LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` alias one Access principal back
+  to `"owner"` when that flip happens.
+- Planned Container `max_instances` for a teaching deploy is **5**
+  (concurrent *running* containers, not user count). Today's
+  `wrangler.jsonc` stays at `1` until sandbox ids split.
 
 ## Develop a plugin
 

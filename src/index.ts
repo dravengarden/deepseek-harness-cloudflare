@@ -57,6 +57,7 @@ export default {
           model: env.DEEPSEEK_MODEL || "deepseek-v4-flash",
           email: identity.email,
           auth: identity.source,
+          ...(identity.sub ? { sub: identity.sub } : {}),
         })
       }
       const answerMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/answer$/)

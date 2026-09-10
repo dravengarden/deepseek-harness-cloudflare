@@ -5,6 +5,16 @@ Do not run the official `dsh` CLI or treat Node as the harness runtime.
 `nodejs_compat` is present because the official Cloudflare Sandbox SDK
 requires it; plugins still must not import `node:` APIs.
 
+A Worker script is required. Access, Assets, Durable Objects, Containers,
+and R2 cannot bind each other. The Worker is entry + auth + binding fan-out,
+not the agent loop. GUI is the Workers Assets SPA; do not host official
+`dsh-web-frontend`, Typert, or Node `dsh web`.
+
+Routing is `idFromName("owner")`. `identityKey()` is the per-user helper;
+`IDENTITY_MODE` unset = shared-owner. Do not change routing off `"owner"`
+until the identity PR. Architecture target is one HarnessObject + Sandbox
+per Access identity; do not claim routing is already per-user.
+
 Linux (bash, `/workspace`) is the official `@cloudflare/sandbox` container,
 not the Durable Object isolate. Sleep with `sleepAfter: "10m"` (no
 `keepAlive`). Persist `/workspace` with `createBackup` on

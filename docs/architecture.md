@@ -21,9 +21,9 @@ upstream seams so they can run in a Durable Object.
 
 ```text
 browser
-  │  cookie
+  │  Access JWT or access-key cookie
   ▼
-Worker          auth, static UI, route /api/* to one Durable Object
+Worker          entry + auth + binding fan-out; /api/* → Durable Object
   │
   ▼
 HarnessObject   Durable Object + SQLite
@@ -48,6 +48,22 @@ truth. That matches DeepSeek Harness: model-visible facts are logged events.
 The Worker uses `fetch`, Web Crypto, Web Streams, and Durable Object SQL.
 `nodejs_compat` is enabled only because the official Sandbox SDK wrangler
 template requires it. Plugins still must not import `node:` APIs.
+
+## Worker
+
+A Worker script is **required**. Cloudflare Access, Workers Assets, Durable
+Objects, Containers, and R2 cannot bind each other.
+
+| Belief | Reality |
+|---|---|
+| Access sits in front, so the Worker is optional | Access injects `Cf-Access-Jwt-Assertion`. Something must verify it, call `idFromName` / `getSandbox`, and hold the bindings. |
+| The GUI is static, so the Worker is optional | Assets can serve `public/` without invoking the Worker. `/api/*`, login, and bindings still need the script. |
+| The Durable Object holds state, so the Worker is redundant | DO classes are exported from the Worker module and bound in `wrangler.jsonc`. |
+
+The Worker is entry + auth + binding fan-out. It is not the agent loop, not
+session SQLite, and not Linux. Those stay on `HarnessObject` and the Sandbox
+container. Official `dsh-web-frontend`, Typert, and Node `dsh web` are
+rejected; the GUI is the Workers Assets SPA.
 
 ## What we keep from DeepSeek Harness
 
@@ -111,9 +127,17 @@ Production authenticates with **Cloudflare Access**. The Worker validates
 `Cf-Access-Jwt-Assertion` against the team JWKS (`TEAM_DOMAIN` +
 `POLICY_AUD`). Local `wrangler dev` falls back to `DSH_CF_ACCESS_KEY`.
 
-The browser never chooses the Durable Object id; traffic still goes to
-`idFromName("owner")`. Access is the identity gate, not a multi-tenant
-harness. See [`web.md`](web.md).
+The browser never chooses the Durable Object id. Traffic still goes to
+`idFromName("owner")`. Access is the identity gate; this host does not yet
+route per user.
+
+The architecture *target* is one HarnessObject and one Sandbox per Access
+identity (`identityKey()` in `src/identity.ts`: `user:<sub>` when
+`IDENTITY_MODE=per-user`; local access-key → `"local"`). The *ship default*
+is `IDENTITY_MODE` unset = `shared-owner` so existing owner SQLite is not
+orphaned. Email is display-only; production per-user uses Access `sub`.
+Planned teaching-deploy `max_instances` is 5 concurrent running containers;
+today's config stays at 1 until sandbox ids split. See [`web.md`](web.md).
 
 ## Persistence
 

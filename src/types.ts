@@ -17,6 +17,9 @@ export interface Env {
   R2_SECRET_ACCESS_KEY?: string
   TEAM_DOMAIN?: string
   POLICY_AUD?: string
+  IDENTITY_MODE?: "per-user" | "shared-owner"
+  LEGACY_OWNER_EMAIL?: string
+  LEGACY_OWNER_SUB?: string
 }
 
 export type Role = "system" | "user" | "assistant" | "tool"
