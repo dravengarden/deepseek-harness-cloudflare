@@ -39,7 +39,7 @@ HarnessObject          Durable Object + SQLite
   ├─ schedule                    Durable Object alarms
   └─ agent-loop                  deriveMessages → stream → tools → turn/end
 
-ControlMailbox         ask / answer / abort waiters (named "owner")
+ControlMailbox         ask / answer / abort waiters (same identityKey as Harness)
 Sandbox                official @cloudflare/sandbox container
                        sleepAfter 10m, backup /workspace to R2 on idle
 ```
@@ -52,12 +52,13 @@ need the script. Durable Object classes are exported from the Worker module.
 The Worker is entry + auth + binding fan-out, not the agent loop (that lives
 on `HarnessObject`; Linux lives in the Sandbox).
 
-Routing is still `idFromName("owner")`. The browser never picks a Durable
-Object id. The architecture *target* is one HarnessObject and one Sandbox
-per Access identity (`identityKey()` in `src/identity.ts`). The *ship
-default* is `IDENTITY_MODE` unset (`shared-owner`) so existing owner SQLite
-is not orphaned. This host does not yet route per user; flipping to
-`per-user` is an explicit later operator step.
+The Worker derives `identityKey()` after auth and addresses Harness,
+Mailbox, and Sandbox with `getByName(key)`. The browser never picks a
+Durable Object id. The architecture *target* is one HarnessObject and one
+Sandbox per Access identity. The *ship default* is `IDENTITY_MODE` unset
+(`shared-owner`) so existing owner SQLite is not orphaned — routing is
+wired, but production still shares `"owner"` until an operator flips to
+`per-user`.
 
 The GUI is the Workers Assets SPA in `public/`. Official
 `dsh-web-frontend`, Typert, and Node `dsh web` are rejected — they need a
@@ -89,7 +90,8 @@ More detail: [`docs/architecture.md`](docs/architecture.md),
 | `/workspace` persistence via `createBackup` on `onActivityExpired` | Yes |
 | Permissions: `workspace-write` (ask) / `danger-full-access` (never ask) | Yes |
 | Web UI: Workers Assets SPA (workbench layout on `/api`) | Yes (not `dsh-web-frontend` / Typert / Node `dsh web`) |
-| Plugin host: `composeHarness(env, sql, { plugins })` | Yes |
+| Plugin host: `composeHarness(env, sql, { identityKey, plugins })` | Yes |
+| Identity routing (`getByName(identityKey())`) | Yes (default shared-owner `"owner"`; `per-user` is an operator flip) |
 
 ## What is not migrated
 
@@ -110,7 +112,6 @@ process. They are **not** in this repository. Full table:
 | Workflow / ralph / `run_code` PTC | Worker threads / `node:vm` |
 | Dynamic `cordis_*` plugins | Untrusted package load |
 | PowerShell, vision / `read_image`, agent teams, goals | Not on this runtime |
-| Per-user HarnessObject + Sandbox (`IDENTITY_MODE=per-user`) | Helper exists (`identityKey()`); routing is still `idFromName("owner")` and is not wired yet |
 
 Do not expect `npx @deepseek-ai/dsh web` plugins to `dsh plugin add` onto this
 Worker. Third-party plugins must be Cordis modules mounted from
@@ -149,6 +150,8 @@ Fill `.dev.vars` (never commit this file):
 | `POLICY_AUD` | omit | Access application AUD |
 | `CLOUDFLARE_ACCOUNT_ID` | omit | required for production backups |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | omit | R2 API token with object read/write |
+| `IDENTITY_MODE` | omit (shared-owner) | omit until you flip to `per-user` |
+| `LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` | omit | set in the same deploy as `per-user` if you need the old `"owner"` SQLite |
 
 ### 2. Local development
 
@@ -235,13 +238,21 @@ key. After they are set, `/api/login` is disabled.
 - Default backup TTL is 7 days. Production restore is a FUSE overlay that
   vanishes on the next sleep and is restored again from the stored handle.
 - `IDENTITY_MODE` unset (or `shared-owner`) keeps the `"owner"` object.
-  `per-user` is the planned split (`user:<sub>`, local access-key →
-  `"local"`) and is **not** wired into routing yet. Optional
-  `LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` alias one Access principal back
-  to `"owner"` when that flip happens.
-- Planned Container `max_instances` for a teaching deploy is **5**
-  (concurrent *running* containers, not user count). Today's
-  `wrangler.jsonc` stays at `1` until sandbox ids split.
+  `per-user` splits to `user:<sub>` (Access) and `"local"` (access-key).
+  Optional `LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` alias one Access
+  principal back to `"owner"`.
+- First deploy keeps `IDENTITY_MODE` unset. To flip to per-user:
+  1. Confirm whether `"owner"` still has sessions you need (`GET /api/sessions`).
+  2. If yes, set `LEGACY_OWNER_SUB` (preferred) or `LEGACY_OWNER_EMAIL` in
+     the same deploy as `IDENTITY_MODE=per-user`.
+  3. If that SQLite is disposable, set `IDENTITY_MODE=per-user` without an
+     alias and accept empty sessions.
+- Local `wrangler dev` with `per-user` + access-key routes to `"local"`, not
+  `"owner"`. That is a **breaking local change** versus today's `"owner"`
+  SQLite. Stay unset/`shared-owner` to keep local sessions, or treat them
+  as disposable.
+- Container `max_instances` is **5**: concurrent *running* containers, not
+  registered users. Sleeping sandboxes do not count.
 
 ## Develop a plugin
 
@@ -267,7 +278,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-Mount it from `composeHarness(env, sql, { plugins: [acme] })`. See
+Mount it from `composeHarness(env, sql, { identityKey, plugins: [acme] })`. See
 [`docs/plugins.md`](docs/plugins.md).
 
 ## License

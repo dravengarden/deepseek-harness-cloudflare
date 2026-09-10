@@ -37,6 +37,7 @@ import type { SqlStorage } from "./sql.ts"
 import type { Env } from "./types.ts"
 
 export interface ComposeOptions {
+  identityKey: string
   plugins?: Plugin[]
   armAlarm?: (at: number) => void
 }
@@ -44,24 +45,25 @@ export interface ComposeOptions {
 export async function composeHarness(
   env: Env,
   sql: SqlStorage,
-  options: ComposeOptions = {},
+  options: ComposeOptions,
 ): Promise<Context> {
   const ctx = new Context()
   const model = env.DEEPSEEK_MODEL || "deepseek-v4-flash"
   const apiKey = env.DEEPSEEK_API_KEY
+  const identityKey = options.identityKey
 
   await ctx.plugin(SettingsService, { sql })
   await ctx.plugin(SessionService, { sql })
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(WebRuntime)
   await ctx.plugin(ToolService)
-  await ctx.plugin(ExecutionService, { env })
+  await ctx.plugin(ExecutionService, { env, identityKey })
   await ctx.plugin(SystemPromptService)
   await ctx.plugin(CommandService)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(ScheduleService, { sql, armAlarm: options.armAlarm })
   await ctx.plugin(SkillService)
-  await ctx.plugin(QuestionService, { env })
+  await ctx.plugin(QuestionService, { env, identityKey })
   await ctx.plugin(PermissionService)
   await ctx.plugin(llmDeepseek, { apiKey, model, baseURL: llmDeepseek.DEFAULT_BASE_URL })
   await ctx.plugin(webSearchDeepseek, { apiKey, model })

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { IdentityError, identityKey, type Identity } from "../src/identity.ts"
+import { IdentityError, identityErrorResponse, identityKey, type Identity } from "../src/identity.ts"
 import type { Env } from "../src/types.ts"
 
 function env(partial: {
@@ -73,4 +73,16 @@ test("email is never used as tenant id when sub is present", () => {
   assert.equal(key, "user:stable-sub")
   assert.equal(key.includes("alice"), false)
   assert.equal(key.includes("@"), false)
+})
+
+test("IdentityError maps to 403 JSON", async () => {
+  const response = identityErrorResponse(new IdentityError("Access JWT missing sub"))
+  assert.ok(response)
+  assert.equal(response.status, 403)
+  assert.deepEqual(await response.json(), { error: "Access JWT missing sub" })
+})
+
+test("identityErrorResponse ignores other errors", () => {
+  assert.equal(identityErrorResponse(new Error("boom")), undefined)
+  assert.equal(identityErrorResponse("boom"), undefined)
 })

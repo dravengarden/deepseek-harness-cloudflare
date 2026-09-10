@@ -3,6 +3,7 @@ import type { Env } from "../types.ts"
 
 export interface QuestionConfig {
   env: Env
+  identityKey: string
 }
 
 export class QuestionService extends Service {
@@ -14,7 +15,7 @@ export class QuestionService extends Service {
   }
 
   async ask(sessionId: string, id: string, timeoutMs: number, signal?: AbortSignal): Promise<string> {
-    const stub = this.config.env.MAILBOX.getByName("owner")
+    const stub = this.config.env.MAILBOX.getByName(this.config.identityKey)
     if (signal?.aborted) {
       await stub.abort(sessionId, id)
       throw new Error("ask_user_question cancelled")

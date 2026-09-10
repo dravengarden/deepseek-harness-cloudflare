@@ -26,12 +26,11 @@ The browser hits Access login first. The SPA then calls `/api/me` with the
 JWT already on the request. Sign out goes to
 `https://<team>.cloudflareaccess.com/cdn-cgi/access/logout`.
 
-Routing is still **one owner** (`idFromName("owner")`). Access decides
-*who may use* the app. The architecture target is one HarnessObject and one
-Sandbox per Access identity (`identityKey()`); the ship default is
-`IDENTITY_MODE` unset = `shared-owner` so existing owner SQLite is not
-orphaned. This host does not yet route per user. `/api/me` may include
-Access `sub` when present; that value is unused for routing.
+The Worker routes with `getByName(identityKey())`. Access decides *who may
+use* the app. The architecture target is one HarnessObject and one Sandbox
+per Access identity. The ship default is `IDENTITY_MODE` unset =
+`shared-owner` (`"owner"`), so production is not per-user until an operator
+flips. `/api/me` may include Access `sub` when present.
 
 ### Local: access key
 

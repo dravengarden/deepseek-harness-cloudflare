@@ -10,11 +10,10 @@ and R2 cannot bind each other. The Worker is entry + auth + binding fan-out,
 not the agent loop. GUI is the Workers Assets SPA; do not host official
 `dsh-web-frontend`, Typert, or Node `dsh web`.
 
-Routing is `idFromName("owner")`. `identityKey()` is the per-user helper;
-`IDENTITY_MODE` unset = shared-owner. Do not call `identityKey()` for
-HARNESS / Sandbox / mailbox until identity routing is wired. Architecture
-target is one HarnessObject + Sandbox per Access identity; do not claim
-routing is already per-user.
+Routing is `getByName(identityKey())` for Harness, Mailbox, and Sandbox.
+`IDENTITY_MODE` unset = shared-owner (`"owner"`). Architecture target is
+one HarnessObject + Sandbox per Access identity after an operator flip to
+`per-user`; do not claim production is already per-user.
 
 Linux (bash, `/workspace`) is the official `@cloudflare/sandbox` container,
 not the Durable Object isolate. Sleep with `sleepAfter: "10m"` (no

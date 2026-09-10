@@ -5,6 +5,7 @@ import {
   cookieHeader,
   resolveIdentity,
 } from "./auth.ts"
+import { identityErrorResponse, identityKey } from "./identity.ts"
 import { HarnessObject } from "./object.ts"
 import type { Env } from "./types.ts"
 
@@ -61,17 +62,26 @@ export default {
           ...(identity.sub ? { sub: identity.sub } : {}),
         })
       }
+      let key: string
+      try {
+        key = identityKey(identity, env)
+      } catch (error) {
+        const forbidden = identityErrorResponse(error)
+        if (forbidden) return forbidden
+        throw error
+      }
+      const mailbox = env.MAILBOX.getByName(key)
+      const harness = env.HARNESS.getByName(key)
       const answerMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/answer$/)
       if (request.method === "POST" && answerMatch) {
         const body = await request.json().catch(() => ({})) as { id?: string; answer?: string }
         const id = body.id ?? ""
         const answer = body.answer ?? ""
         if (!id || !answer) return Response.json({ error: "id and answer are required" }, { status: 400 })
-        const ok = await env.MAILBOX.getByName("owner").answer(answerMatch[1]!, id, answer)
+        const ok = await mailbox.answer(answerMatch[1]!, id, answer)
         return Response.json({ ok })
       }
-      const id = env.HARNESS.idFromName("owner")
-      return env.HARNESS.get(id).fetch(request)
+      return harness.fetch(request)
     }
 
     return env.ASSETS.fetch(request)

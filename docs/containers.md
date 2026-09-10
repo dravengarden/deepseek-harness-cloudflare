@@ -16,7 +16,7 @@ workspace persistence follow the Sandbox docs.
 | Worker export | `export { Sandbox } from "@cloudflare/sandbox"` |
 | Image | `FROM docker.io/cloudflare/sandbox:0.12.9` (must match the npm version) |
 | Binding | `containers` + Durable Object `Sandbox` + migration `v2` |
-| Client | `getSandbox(env.Sandbox, "owner", { sleepAfter: "10m" })` |
+| Client | `getSandbox(env.Sandbox, identityKey, { sleepAfter: "10m" })` |
 | Commands / files | `exec`, `readFile`, `writeFile`, `listFiles`, `mkdir`, `deleteFile` |
 | Sleep | default `sleepAfter = "10m"`, `keepAlive` left false |
 | Workspace across sleep | `createBackup({ dir: "/workspace" })` / `restoreBackup(handle)` |
@@ -27,7 +27,11 @@ is not a Node process.
 
 `instance_type` is `basic` (1 GiB), not the hello-world `lite` (256 MiB), so
 python/git/bash in the official image can actually run. `max_instances` is
-`1`: one owner, one sandbox.
+`5`: concurrent *running* containers, not registered users. Sleeping
+sandboxes do not consume a slot. Default identity is still shared-owner
+(`"owner"`); per-user sandbox ids apply after `IDENTITY_MODE=per-user`.
+A start that exceeds the cap fails Linux tools with
+`sandbox capacity reached (max_instances); retry when another workspace sleeps`.
 
 ## Auto-shutdown
 

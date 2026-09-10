@@ -9,14 +9,19 @@ export class HarnessObject extends DurableObject<Env> {
   private harness: Context | undefined
 
   private async context(): Promise<Context> {
-    if (!this.harness) {
-      this.harness = await composeHarness(this.env, this.ctx.storage.sql as SqlStorage, {
+    const identityKey = this.ctx.id.name ?? "owner"
+    const existing = this.harness
+    if (existing) return existing
+    const composed = await this.ctx.blockConcurrencyWhile(async () => {
+      return this.harness ?? await composeHarness(this.env, this.ctx.storage.sql as SqlStorage, {
+        identityKey,
         armAlarm: (at) => {
           void this.ctx.storage.setAlarm(at)
         },
       })
-    }
-    return this.harness
+    })
+    this.harness = composed
+    return composed
   }
 
   async alarm(): Promise<void> {

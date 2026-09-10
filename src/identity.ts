@@ -27,3 +27,9 @@ export class IdentityError extends Error {
     this.name = "IdentityError"
   }
 }
+
+export function identityErrorResponse(error: unknown): Response | undefined {
+  if (error instanceof IdentityError) {
+    return Response.json({ error: error.message }, { status: 403 })
+  }
+}
