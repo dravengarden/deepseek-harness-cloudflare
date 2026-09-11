@@ -50,7 +50,7 @@ and `sub` when the Access JWT has one. `LOCAL_DEV` does not gate these fields.
 | Field | Meaning |
 |---|---|
 | `ok` | `true` |
-| `model` | `DEEPSEEK_MODEL` or `deepseek-v4-flash` |
+| `model` | `DEEPSEEK_MODEL` or `deepseek-flash` (V4.1 Flash) |
 | `email` | Display only. Never a tenant id. |
 | `auth` | `"access"` or `"key"` |
 | `identityKey` | Durable Object name from `identityKey()`: `owner`, `local`, or `user:<sub>` |

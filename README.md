@@ -31,7 +31,7 @@ HarnessObject          Durable Object + SQLite
   ▼
 @deepseek-ai/cordis 4.x
   ├─ settings / session / agents
-  ├─ llm + llm-deepseek          api.deepseek.com  (V4 Flash)
+  ├─ llm + llm-deepseek          api.deepseek.com  (V4.1 Flash, `deepseek-flash`)
   ├─ web + search / fetch        native search + public HTTP (SSRF-gated)
   ├─ tools + linux / web / skill / todo / schedule / subagent / ask-user
   ├─ execution → Sandbox DO      bash, /workspace, createBackup on idle
@@ -88,7 +88,7 @@ More detail: [`docs/architecture.md`](docs/architecture.md),
 |---|---|
 | Official Cordis kernel (no Loader / HMR) | Yes |
 | Session log, `deriveMessages()`, fork | Yes |
-| DeepSeek V4 Flash + thinking + tools | Yes |
+| DeepSeek V4.1 Flash (`deepseek-flash`) + thinking + tools | Yes |
 | `web_search` / `web_fetch` | Yes |
 | Skills: catalog, `skill` tool, `/name`, bundled + `/workspace` SKILL.md | Yes |
 | Subagent: in-process spawn / fork, max depth 3 | Yes |
@@ -152,7 +152,7 @@ Fill `.dev.vars` (never commit this file):
 |---|---|---|
 | `DEEPSEEK_API_KEY` | required | `wrangler secret put` |
 | `DSH_CF_ACCESS_KEY` | required (long random string) | unused if Access is on |
-| `DEEPSEEK_MODEL` | optional, default `deepseek-v4-flash` | optional |
+| `DEEPSEEK_MODEL` | optional, default `deepseek-flash` (V4.1 Flash) | optional |
 | `LOCAL_DEV=1` | required so backups use the R2 binding | omit |
 | `TEAM_DOMAIN` | omit | `https://<team>.cloudflareaccess.com` |
 | `POLICY_AUD` | omit | Access application AUD |

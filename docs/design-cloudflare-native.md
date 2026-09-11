@@ -74,7 +74,7 @@ The Worker entry is small and already close to the right shape:
       if (url.pathname === "/api/me") {
         return Response.json({
           ok: true,
-          model: env.DEEPSEEK_MODEL || "deepseek-v4-flash",
+          model: env.DEEPSEEK_MODEL || "deepseek-flash",
           email: identity.email,
           auth: identity.source,
         })
@@ -280,7 +280,7 @@ flowchart TB
   end
 
   R2["R2 BACKUP_BUCKET<br/>squashfs TTL 7d"]
-  LLM["api.deepseek.com<br/>V4 Flash + web_search"]
+  LLM["api.deepseek.com<br/>V4.1 Flash + web_search"]
 
   SPA -->|GET /| gui
   SPA -->|/api/*| Auth --> Route

@@ -97,7 +97,7 @@ AbortSignal over Durable Object RPC.
 | Kernel | `@deepseek-ai/cordis` | Official package. Loader/include unused. |
 | Session | `dsh-session` | Append-only log, `deriveMessages()`, `fork()` |
 | Agents | `dsh-agent` | `ctx.agents`, Agent handle |
-| LLM | `dsh-llm` + `dsh-llm-deepseek` | Adapter seam + Flash |
+| LLM | `dsh-llm` + `dsh-llm-deepseek` | Adapter seam + V4.1 Flash (`deepseek-flash`) |
 | Web | `dsh-web` family | Provider registry + official search/fetch |
 | Tools | `dsh-tools` + `dsh-tool-web` | Register/unwind + execute events |
 | Prompt | `dsh-system-prompt` | Ordered sections plugins can add |

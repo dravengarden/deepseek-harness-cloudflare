@@ -33,6 +33,7 @@ import { ToolService } from "./plugins/tools.ts"
 import * as webFetchHttp from "./plugins/web-fetch-http.ts"
 import * as webSearchDeepseek from "./plugins/web-search-deepseek.ts"
 import { WebRuntime } from "./plugins/web.ts"
+import { resolveDeepseekModel } from "./lib/model.ts"
 import type { SqlStorage } from "./sql.ts"
 import type { Env } from "./types.ts"
 
@@ -48,7 +49,7 @@ export async function composeHarness(
   options: ComposeOptions,
 ): Promise<Context> {
   const ctx = new Context()
-  const model = env.DEEPSEEK_MODEL || "deepseek-v4-flash"
+  const model = resolveDeepseekModel(env)
   const apiKey = env.DEEPSEEK_API_KEY
   const identityKey = options.identityKey
 

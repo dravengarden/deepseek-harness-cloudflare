@@ -7,6 +7,7 @@ import {
 } from "./auth.ts"
 import { identityErrorResponse, identityKey, identityMode } from "./identity.ts"
 import { log } from "./lib/log.ts"
+import { resolveDeepseekModel } from "./lib/model.ts"
 import { HarnessObject } from "./object.ts"
 import type { Env } from "./types.ts"
 
@@ -75,7 +76,7 @@ export default {
       if (url.pathname === "/api/me") {
         return Response.json({
           ok: true,
-          model: env.DEEPSEEK_MODEL || "deepseek-v4-flash",
+          model: resolveDeepseekModel(env),
           email: identity.email,
           auth: identity.source,
           identityKey: key,

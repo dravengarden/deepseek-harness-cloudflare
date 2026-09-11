@@ -1,7 +1,7 @@
 # Fill these locally. Do not commit .dev.vars.
 DEEPSEEK_API_KEY=
 DSH_CF_ACCESS_KEY=
-DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_MODEL=deepseek-flash
 # wrangler dev: official backup API uses the R2 binding instead of presigned URLs
 LOCAL_DEV=1
 # Production backups also need CLOUDFLARE_ACCOUNT_ID plus R2 API token secrets:

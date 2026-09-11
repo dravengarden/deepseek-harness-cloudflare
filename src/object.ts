@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers"
 import type { Context } from "@deepseek-ai/cordis"
 import { composeHarness } from "./compose.ts"
 import { log } from "./lib/log.ts"
+import { resolveDeepseekModel } from "./lib/model.ts"
 import { sseStream } from "./lib/sse.ts"
 import type { SqlStorage } from "./sql.ts"
 import type { Env } from "./types.ts"
@@ -71,7 +72,7 @@ export class HarnessObject extends DurableObject<Env> {
     if (request.method === "GET" && url.pathname === "/api/settings") {
       return Response.json({
         permission: ctx.permissions.preset(),
-        model: this.env.DEEPSEEK_MODEL || "deepseek-v4-flash",
+        model: resolveDeepseekModel(this.env),
       })
     }
 
