@@ -1,5 +1,5 @@
 import { Service, type Context } from "@deepseek-ai/cordis"
-import type { SqlStorage } from "../sql.ts"
+import { firstRow, type SqlStorage } from "../sql.ts"
 
 export interface SettingsConfig {
   sql: SqlStorage
@@ -20,7 +20,7 @@ export class SettingsService extends Service {
   }
 
   get<T extends Record<string, unknown>>(namespace: string, defaults: T): T {
-    const row = this.config.sql.exec("SELECT document FROM settings WHERE namespace = ?", namespace).one()
+    const row = firstRow(this.config.sql.exec("SELECT document FROM settings WHERE namespace = ?", namespace))
     if (!row) return { ...defaults }
     try {
       return { ...defaults, ...(JSON.parse(String(row.document)) as T) }

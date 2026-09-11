@@ -166,13 +166,16 @@ Fill `.dev.vars` (never commit this file):
 Start Docker, then:
 
 ```bash
+# Rootless Docker / NixOS often need these:
+# export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
+# export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 npx wrangler dev
 # or: just dev
 ```
 
-Open the printed URL, enter the access key, start a session. The first
-Sandbox start builds `Dockerfile` (`FROM docker.io/cloudflare/sandbox:0.12.9`)
-and can take a few minutes.
+Open the printed URL, enter `DSH_CF_ACCESS_KEY` from `.dev.vars`, start a
+session. The first Sandbox start builds `Dockerfile`
+(`FROM docker.io/cloudflare/sandbox:0.12.9`) and can take a few minutes.
 
 ```bash
 npm run verify

@@ -6,3 +6,9 @@ export interface SqlCursor {
 export interface SqlStorage {
   exec(query: string, ...bindings: unknown[]): SqlCursor
 }
+
+/** Workers `.one()` throws on zero rows. Use this for optional lookups. */
+export function firstRow(cursor: SqlCursor): Record<string, unknown> | null {
+  for (const row of cursor) return row
+  return null
+}

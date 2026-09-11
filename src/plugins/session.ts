@@ -1,7 +1,7 @@
 import { Service, type Context } from "@deepseek-ai/cordis"
 import { deriveMessages } from "../lib/derive-messages.ts"
 import { randomId } from "../lib/ids.ts"
-import type { SqlStorage } from "../sql.ts"
+import { firstRow, type SqlStorage } from "../sql.ts"
 import type { SessionEvent, SessionRecord } from "../types.ts"
 
 export { deriveMessages }
@@ -98,10 +98,10 @@ export class SessionService extends Service {
   }
 
   get(id: string): Session | null {
-    const row = this.config.sql.exec(
+    const row = firstRow(this.config.sql.exec(
       "SELECT id, title, created_at, parent_id FROM sessions WHERE id = ?",
       id,
-    ).one()
+    ))
     if (!row) return null
     return new Session(this, rowToRecord(row))
   }

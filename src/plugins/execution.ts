@@ -35,7 +35,6 @@ export class ExecutionService extends Service {
       const result = await sandbox.exec(command, {
         cwd: cwd ? resolveWorkspacePath(cwd) : WORKSPACE_ROOT,
         timeout: 30_000,
-        signal,
       })
       return {
         success: result.success,
