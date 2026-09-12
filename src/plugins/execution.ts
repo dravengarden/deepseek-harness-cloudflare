@@ -34,7 +34,7 @@ export class ExecutionService extends Service {
     return this.runLinux(async (sandbox) => {
       const result = await sandbox.exec(command, {
         cwd: cwd ? resolveWorkspacePath(cwd) : WORKSPACE_ROOT,
-        timeout: 30_000,
+        timeout: 120_000,
       })
       return {
         success: result.success,

@@ -83,10 +83,18 @@ Official `dsh-web-frontend`, Typert, and Node `dsh web` are **rejected**.
 (`/api/remote.mux`, session.create/prompt, …). That host plane is not on
 Workers. A Typert adapter in the Worker would be a second harness.
 
-The GUI is the **Workers Assets SPA** in `public/`: official dark tokens
-(`--dsw-*`, DeepSeek wordmark, 56px rail + session sidebar, composer) and
-the official favicon, wired to this host's `/api`. It is not the React
-slot client.
+The GUI is two independent Workers Assets surfaces over the same `/api`:
+
+- **Desktop** `/` — `public/index.html` + `styles.css` + `app.js`. Official
+  dark tokens, 56px rail, session sidebar, composer. No mobile breakpoints.
+- **Mobile** `/m` — `public/m.html` + `mobile.css` + `mobile.js`. Independent
+  chat shell: visualViewport keyboard, dock Stop while streaming, empty
+  state, no session UUIDs in chrome. Not `chat.deepseek.com` and not
+  `dsh-web-frontend`.
+
+Phone UAs hitting `/` redirect to `/m`. `/?ui=desktop` and `/m` "Desktop
+site" pin a `dsh_ui` cookie. Both UIs share the access-key / Access cookie
+and harness APIs. It is not the React slot client.
 
 ## UI
 

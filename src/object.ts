@@ -97,6 +97,21 @@ export class HarnessObject extends DurableObject<Env> {
       return Response.json({ session: session.record, events: session.events() })
     }
 
+    if (request.method === "DELETE" && sessionMatch) {
+      const sessionId = sessionMatch[1]!
+      agentLoop.cancel(sessionId)
+      if (!sessions.remove(sessionId)) return jsonError("session not found", 404)
+      log({
+        level: "info",
+        msg: "session delete",
+        identityKey,
+        sessionId,
+        route: url.pathname,
+        doClass: "HarnessObject",
+      })
+      return Response.json({ ok: true })
+    }
+
     const forkMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/fork$/)
     if (request.method === "POST" && forkMatch) {
       const body = await readJson(request)

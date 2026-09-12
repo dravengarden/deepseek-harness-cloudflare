@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>DeepSeek Harness</title>
+    <script>
+      (function () {
+        var q = new URLSearchParams(location.search).get("ui");
+        if (q === "desktop") return;
+        if (q === "mobile" || matchMedia("(max-width: 800px)").matches) location.replace("/m");
+      })();
+    </script>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body data-ds-dark-theme>
@@ -14,7 +21,7 @@
         <p class="boot-hint">Local wrangler uses an access key. Production uses Cloudflare Access.</p>
         <label>
           Access key
-          <input id="access-key" type="password" autocomplete="current-password" />
+          <input id="access-key" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
         </label>
         <button id="login-btn" type="button">Continue</button>
         <p id="login-error" class="error" hidden></p>

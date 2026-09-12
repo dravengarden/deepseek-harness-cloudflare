@@ -50,7 +50,8 @@ export class Sandbox extends CloudflareSandbox<SandboxEnv> {
       dir: WORKSPACE_ROOT,
       name: "workspace",
       ttl: BACKUP_TTL_SECONDS,
-      localBucket: Boolean(this.env.LOCAL_DEV),
+      // BACKUP_BUCKET is always bound; skip presigned-URL tokens.
+      localBucket: true,
     })
     await this.ctx.storage.put(HANDLE_KEY, backup)
     if (previous && previous.id !== backup.id) {

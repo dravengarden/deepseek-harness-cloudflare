@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#151517" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>DeepSeek Harness</title>
+    <link rel="stylesheet" href="/mobile.css?v=layout7" />
+  </head>
+  <body>
+    <section id="login" class="login" hidden>
+      <div class="login-card">
+        <p class="wordmark">DEEPSEEK HARNESS</p>
+        <p class="muted">Local wrangler uses an access key.</p>
+        <label>
+          Access key
+          <input
+            id="access-key"
+            type="text"
+            inputmode="text"
+            enterkeyhint="go"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            data-1p-ignore
+            data-lpignore="true"
+          />
+        </label>
+        <button id="login-btn" type="button">Continue</button>
+        <p id="login-error" class="error" hidden></p>
+        <a class="plain" href="/?ui=desktop">Desktop site</a>
+      </div>
+    </section>
+
+    <div id="app" class="phone" hidden>
+      <header class="top">
+        <button id="open-drawer" class="icon" type="button" aria-label="Sessions" aria-controls="drawer" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <div class="top-title">
+          <h1 id="title">New chat</h1>
+          <p id="live" class="live" hidden>Thinking</p>
+        </div>
+        <button id="new-chat" class="icon" type="button" aria-label="New chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div id="progress" class="progress" hidden></div>
+
+      <div class="stage">
+        <div id="transcript" class="thread" aria-live="polite"></div>
+        <div id="empty" class="empty">
+          <p class="empty-title">What do you want to do?</p>
+          <p class="muted">Tools run in a Linux sandbox. Ask, then send — Stop stays on the keyboard bar.</p>
+        </div>
+      </div>
+
+      <form id="composer" class="dock">
+        <div id="slash-menu" class="slash" hidden></div>
+        <div class="dock-row">
+          <textarea
+            id="prompt"
+            rows="1"
+            placeholder="Message"
+            enterkeyhint="send"
+            autocapitalize="sentences"
+            autocomplete="off"
+            autocorrect="on"
+            spellcheck="true"
+          ></textarea>
+          <button id="send-btn" class="send" type="submit" aria-label="Send" disabled>
+            <svg class="icon-send" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="icon-stop" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div id="scrim" class="scrim" hidden></div>
+    <aside id="drawer" class="drawer" hidden role="dialog" aria-modal="true" aria-label="Sessions">
+      <div class="drawer-head">
+        <p class="wordmark">Sessions</p>
+        <button id="close-drawer" class="icon" type="button" aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <button id="drawer-new" type="button">New chat</button>
+      <nav id="session-list" class="session-list"></nav>
+      <div class="drawer-foot">
+        <p id="model-label" class="muted"></p>
+        <label>
+          Permissions
+          <select id="permission">
+            <option value="workspace-write">Ask before edits</option>
+            <option value="danger-full-access">Don't ask</option>
+          </select>
+        </label>
+        <div class="drawer-actions">
+          <button id="compact-btn" class="ghost" type="button">Compact</button>
+          <button id="fork-btn" class="ghost" type="button">Fork</button>
+        </div>
+        <button id="logout-btn" class="ghost" type="button">Sign out</button>
+        <a class="plain" href="/?ui=desktop">Desktop site</a>
+      </div>
+    </aside>
+
+    <script type="module" src="/mobile.js?v=layout7"></script>
+  </body>
+</html>

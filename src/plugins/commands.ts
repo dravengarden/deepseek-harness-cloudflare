@@ -6,6 +6,13 @@ export class CommandService extends Service {
 
   constructor(ctx: Context) {
     super(ctx, "commands")
+    this.register({
+      name: "help",
+      description: "List available slash commands",
+      run: async () => this.list()
+        .map((command) => `/${command.name} — ${command.description}`)
+        .join("\n"),
+    })
   }
 
   register(command: CommandDefinition): () => void {

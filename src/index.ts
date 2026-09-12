@@ -29,7 +29,7 @@ export default {
         return Response.json({ error: "use Cloudflare Access to sign in" }, { status: 400 })
       }
       const body = await request.json().catch(() => ({})) as { accessKey?: string }
-      const key = body.accessKey ?? ""
+      const key = (body.accessKey ?? "").trim()
       if (!(await accessKeyMatches(env, key))) {
         log({ level: "error", msg: "unauthorized", route: url.pathname, err: "invalid access key" })
         return Response.json({ error: "invalid access key" }, { status: 401 })
@@ -98,6 +98,61 @@ export default {
       return harness.fetch(request)
     }
 
-    return env.ASSETS.fetch(request)
+    return serveAssets(request, env)
   },
 } satisfies ExportedHandler<Env>
+
+const UI_COOKIE = "dsh_ui"
+
+function uiCookie(header: string | null): "mobile" | "desktop" | null {
+  const match = header?.match(/(?:^|;\s*)dsh_ui=(mobile|desktop)/)
+  return (match?.[1] as "mobile" | "desktop" | undefined) ?? null
+}
+
+function looksMobile(ua: string): boolean {
+  return /iPhone|iPod|Android.+Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)
+}
+
+function setUiCookie(kind: "mobile" | "desktop"): string {
+  return `${UI_COOKIE}=${kind}; Path=/; Max-Age=31536000; SameSite=Lax`
+}
+
+async function serveAssets(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return env.ASSETS.fetch(request)
+  }
+  const url = new URL(request.url)
+  const uiParam = url.searchParams.get("ui")
+  const cookie = uiCookie(request.headers.get("Cookie"))
+  const mobileUa = looksMobile(request.headers.get("User-Agent") ?? "")
+  const preferMobile =
+    uiParam === "mobile" ||
+    (uiParam !== "desktop" && (cookie === "mobile" || (cookie !== "desktop" && mobileUa)))
+
+  if (url.pathname === "/" && preferMobile) {
+    const headers = new Headers({ Location: "/m" })
+    if (uiParam === "mobile") headers.set("Set-Cookie", setUiCookie("mobile"))
+    return new Response(null, { status: 302, headers })
+  }
+
+  if (url.pathname === "/" && uiParam === "desktop") {
+    const asset = await env.ASSETS.fetch(request)
+    const headers = new Headers(asset.headers)
+    headers.append("Set-Cookie", setUiCookie("desktop"))
+    return new Response(asset.body, { status: asset.status, headers })
+  }
+
+  if (url.pathname === "/m" || url.pathname === "/m/") {
+    const asset = await env.ASSETS.fetch(
+      new Request(new URL("/m.html", url).toString(), {
+        method: request.method,
+        headers: request.headers,
+      }),
+    )
+    const headers = new Headers(asset.headers)
+    if (uiParam === "mobile") headers.append("Set-Cookie", setUiCookie("mobile"))
+    return new Response(asset.body, { status: asset.status, headers })
+  }
+
+  return env.ASSETS.fetch(request)
+}

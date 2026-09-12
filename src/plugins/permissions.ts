@@ -1,20 +1,11 @@
 import { Service, type Context } from "@deepseek-ai/cordis"
 import { randomId } from "../lib/ids.ts"
+import { toolMutates } from "../lib/tool-mutate.ts"
 
 export type PermissionPreset = "workspace-write" | "danger-full-access"
 
-const MUTATING = new Set([
-  "bash",
-  "write_file",
-  "delete_file",
-  "mkdir",
-  "str_replace_editor",
-  "glob",
-  "grep",
-])
-
 export class PermissionService extends Service {
-  static inject = ["settings", "questions", "sessions", "commands"]
+  static inject = ["settings", "questions", "sessions", "commands", "plan"]
 
   constructor(ctx: Context) {
     super(ctx, "permissions")
@@ -42,9 +33,12 @@ export class PermissionService extends Service {
   }
 
   async approve(name: string, args: Record<string, unknown>): Promise<void> {
-    if (this.preset() === "danger-full-access") return
-    if (!MUTATING.has(name)) return
     const sessionId = this.ctx.tools.sessionId
+    if (sessionId && this.ctx.plan.active(sessionId) && toolMutates(name, args)) {
+      throw new Error("plan mode blocks mutating tools; call exit_plan_mode first")
+    }
+    if (this.preset() === "danger-full-access") return
+    if (!toolMutates(name, args)) return
     if (!sessionId) return
     const session = this.ctx.sessions.get(sessionId)
     if (!session) return

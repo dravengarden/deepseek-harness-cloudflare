@@ -90,7 +90,7 @@ export class SessionService extends Service {
 
   list(): SessionRecord[] {
     const rows = this.config.sql.exec(
-      "SELECT id, title, created_at, parent_id FROM sessions ORDER BY created_at DESC LIMIT 50",
+      "SELECT id, title, created_at, parent_id FROM sessions ORDER BY created_at DESC LIMIT 200",
     )
     const out: SessionRecord[] = []
     for (const row of rows) out.push(rowToRecord(row))
@@ -108,6 +108,13 @@ export class SessionService extends Service {
 
   rename(id: string, title: string): void {
     this.config.sql.exec("UPDATE sessions SET title = ? WHERE id = ?", title.slice(0, 80), id)
+  }
+
+  remove(id: string): boolean {
+    if (!this.get(id)) return false
+    this.config.sql.exec("DELETE FROM events WHERE session_id = ?", id)
+    this.config.sql.exec("DELETE FROM sessions WHERE id = ?", id)
+    return true
   }
 
   fork(sourceId: string, boundary?: number): Session {

@@ -1,7 +1,7 @@
 import { Service, type Context } from "@deepseek-ai/cordis"
 import type { ToolCall, TurnEvent } from "../types.ts"
 
-const MAX_STEPS = 12
+const MAX_STEPS = 24
 
 export class AgentLoop extends Service {
   static inject = ["sessions", "llm", "tools", "systemPrompt", "agents", "skills", "compaction"]

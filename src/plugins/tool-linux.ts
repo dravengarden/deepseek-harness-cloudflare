@@ -1,4 +1,6 @@
 import type { Context } from "@deepseek-ai/cordis"
+import { shQuote } from "../lib/shell-quote.ts"
+import { resolveWorkspacePath } from "../lib/workspace-path.ts"
 
 export const name = "tool-linux"
 export const inject = ["tools", "execution", "systemPrompt", "commands"]
@@ -133,7 +135,12 @@ Use bash / files when a command, script, or local file helps. Do not use the she
       const pattern = String(args.pattern ?? "").trim()
       if (!pattern) return JSON.stringify({ error: "pattern is required" })
       const cwd = args.path === undefined ? undefined : String(args.path)
-      return JSON.stringify(await ctx.execution.bash(`find . -path './${pattern.replace(/'/g, "")}' -print 2>/dev/null | head -n 200`, cwd, signal))
+      const name = pattern.replace(/^\.\//, "").split("/").pop() || pattern
+      return JSON.stringify(await ctx.execution.bash(
+        `find . -name ${shQuote(name)} -print 2>/dev/null | head -n 200`,
+        cwd,
+        signal,
+      ))
     },
   })
 
@@ -149,23 +156,28 @@ Use bash / files when a command, script, or local file helps. Do not use the she
       required: ["pattern"],
     },
     async execute(args, signal) {
-      const pattern = String(args.pattern ?? "").replace(/'/g, "")
+      const pattern = String(args.pattern ?? "").trim()
       if (!pattern) return JSON.stringify({ error: "pattern is required" })
-      const path = args.path === undefined ? "." : String(args.path)
-      return JSON.stringify(await ctx.execution.bash(`grep -R -n -I -E '${pattern}' -- ${path} 2>/dev/null | head -n 200`, undefined, signal))
+      const path = args.path === undefined ? "." : resolveWorkspacePath(String(args.path))
+      return JSON.stringify(await ctx.execution.bash(
+        `grep -R -n -I -E ${shQuote(pattern)} -- ${shQuote(path)} 2>/dev/null | head -n 200`,
+        undefined,
+        signal,
+      ))
     },
   })
 
   ctx.tools.register({
     name: "str_replace_editor",
-    description: "View or uniquely replace a string in a /workspace file.",
+    description: "View, create, or uniquely replace a string in a /workspace file.",
     parameters: {
       type: "object",
       properties: {
-        command: { type: "string", enum: ["view", "str_replace"] },
+        command: { type: "string", enum: ["view", "create", "str_replace"] },
         path: { type: "string" },
         old_str: { type: "string" },
         new_str: { type: "string" },
+        file_text: { type: "string", description: "Full file contents for create" },
       },
       required: ["command", "path"],
     },
@@ -173,6 +185,11 @@ Use bash / files when a command, script, or local file helps. Do not use the she
       const path = String(args.path ?? "").trim()
       if (!path) return JSON.stringify({ error: "path is required" })
       if (args.command === "view") return JSON.stringify(await ctx.execution.readFile(path))
+      if (args.command === "create") {
+        const text = String(args.file_text ?? args.new_str ?? "")
+        return JSON.stringify(await ctx.execution.writeFile(path, text))
+      }
+      if (args.command !== "str_replace") return JSON.stringify({ error: "unknown command" })
       const oldStr = String(args.old_str ?? "")
       const file = await ctx.execution.readFile(path)
       const count = file.content.split(oldStr).length - 1

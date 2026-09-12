@@ -52,16 +52,50 @@ function card(kind, text) {
   return el
 }
 
+function displayTitle(session) {
+  const title = (session?.title || "").trim()
+  if (!title || title === "Untitled") return "New session"
+  return title
+}
+
 function renderSessions() {
   listEl.replaceChildren()
   for (const session of sessions) {
+    const row = document.createElement("div")
+    row.className = "session-row"
     const button = document.createElement("button")
     button.type = "button"
-    button.textContent = session.title || "Untitled"
-    button.className = current?.id === session.id ? "active" : ""
+    button.className = `open${current?.id === session.id ? " active" : ""}`
+    button.textContent = displayTitle(session)
     button.addEventListener("click", () => openSession(session.id))
-    listEl.append(button)
+    const remove = document.createElement("button")
+    remove.type = "button"
+    remove.className = "delete"
+    remove.setAttribute("aria-label", "Delete session")
+    remove.textContent = "×"
+    remove.addEventListener("click", (event) => {
+      event.stopPropagation()
+      deleteSession(session.id)
+    })
+    row.append(button, remove)
+    listEl.append(row)
   }
+}
+
+async function deleteSession(id) {
+  if (!confirm("Delete this session?")) return
+  await api(`/api/sessions/${id}`, { method: "DELETE" })
+  sessions = sessions.filter((session) => session.id !== id)
+  if (current?.id === id) {
+    current = null
+    transcriptEl.replaceChildren()
+    titleEl.textContent = "New session"
+    metaEl.textContent = ""
+    if (sessions[0]) await openSession(sessions[0].id)
+    else renderSessions()
+    return
+  }
+  renderSessions()
 }
 
 function lastStream(kind) {
@@ -177,7 +211,7 @@ async function refreshSessions() {
 async function openSession(id) {
   const body = await api(`/api/sessions/${id}`).then((r) => r.json())
   current = body.session
-  titleEl.textContent = current.title || "Untitled"
+  titleEl.textContent = displayTitle(current)
   metaEl.textContent = current.id
   transcriptEl.replaceChildren()
   for (const event of body.events ?? []) renderEvent(event, false)
@@ -193,7 +227,7 @@ async function ensureSession() {
   current = body.session
   sessions.unshift(current)
   renderSessions()
-  titleEl.textContent = current.title
+  titleEl.textContent = displayTitle(current)
   metaEl.textContent = current.id
   return current
 }
@@ -236,7 +270,7 @@ document.querySelector("#login-btn").addEventListener("click", async () => {
   try {
     await api("/api/login", {
       method: "POST",
-      body: JSON.stringify({ accessKey: document.querySelector("#access-key").value }),
+      body: JSON.stringify({ accessKey: document.querySelector("#access-key").value.trim() }),
     })
     me = await api("/api/me").then((r) => r.json())
     await showApp()
