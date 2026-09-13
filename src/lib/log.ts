@@ -15,7 +15,7 @@ export interface LogFields {
 }
 
 const REDACT_KEY =
-  /jwt|assertion|access[_-]?key|api[_-]?key|authorization|cookie|secret|deepseek_api_key|dsh_cf_access_key/i
+  /jwt|assertion|access[_-]?key|api[_-]?key|authorization|cookie|secret|overlay|deepseek_api_key|dsh_cf_access_key|dsh_overlay_key/i
 const JWT_RE = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g
 const LOG_LIMIT = 256
 

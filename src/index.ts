@@ -8,6 +8,7 @@ import {
 import { identityErrorResponse, identityKey, identityMode } from "./identity.ts"
 import { log } from "./lib/log.ts"
 import { resolveDeepseekModel } from "./lib/model.ts"
+import { overlayBlocked } from "./overlay.ts"
 import { HarnessObject } from "./object.ts"
 import type { Env } from "./types.ts"
 
@@ -21,47 +22,56 @@ export type { Plugin } from "./host.ts"
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const denied = await overlayBlocked(request, env)
+    if (denied) return withSecurityHeaders(denied)
+
     const url = new URL(request.url)
     const secure = url.protocol === "https:"
 
     if (request.method === "POST" && url.pathname === "/api/login") {
       if (accessConfigured(env)) {
-        return Response.json({ error: "use Cloudflare Access to sign in" }, { status: 400 })
+        return withSecurityHeaders(Response.json({ error: "use Cloudflare Access to sign in" }, { status: 400 }))
       }
       const body = await request.json().catch(() => ({})) as { accessKey?: string }
       const key = (body.accessKey ?? "").trim()
       if (!(await accessKeyMatches(env, key))) {
         log({ level: "error", msg: "unauthorized", route: url.pathname, err: "invalid access key" })
-        return Response.json({ error: "invalid access key" }, { status: 401 })
+        return withSecurityHeaders(Response.json({ error: "invalid access key" }, { status: 401 }))
       }
-      return Response.json(
+      return withSecurityHeaders(Response.json(
         { ok: true },
         { headers: { "Set-Cookie": cookieHeader(key, secure) } },
-      )
+      ))
     }
 
     if (request.method === "POST" && url.pathname === "/api/logout") {
       if (accessConfigured(env)) {
-        return Response.json({ ok: true, logout: accessLogoutUrl(env) })
+        return withSecurityHeaders(Response.json({ ok: true, logout: accessLogoutUrl(env) }))
       }
-      return Response.json(
+      return withSecurityHeaders(Response.json(
         { ok: true },
         { headers: { "Set-Cookie": clearCookieHeader(secure) } },
-      )
+      ))
+    }
+
+    if (url.pathname === "/robots.txt") {
+      return withSecurityHeaders(new Response("User-agent: *\nDisallow: /\n", {
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      }))
     }
 
     if (url.pathname.startsWith("/api/")) {
       const identity = await resolveIdentity(request, env)
       if (!identity) {
         log({ level: "error", msg: "unauthorized", route: url.pathname, err: "no jwt / bad key" })
-        return Response.json({ error: "unauthorized" }, { status: 401 })
+        return withSecurityHeaders(Response.json({ error: "unauthorized" }, { status: 401 }))
       }
       let key: string
       try {
         key = identityKey(identity, env)
       } catch (error) {
         const forbidden = identityErrorResponse(error)
-        if (forbidden) return forbidden
+        if (forbidden) return withSecurityHeaders(forbidden)
         throw error
       }
       if (key.startsWith("user:")) {
@@ -74,7 +84,7 @@ export default {
         })
       }
       if (url.pathname === "/api/me") {
-        return Response.json({
+        return withSecurityHeaders(Response.json({
           ok: true,
           model: resolveDeepseekModel(env),
           email: identity.email,
@@ -82,7 +92,7 @@ export default {
           identityKey: key,
           identityMode: identityMode(env),
           ...(identity.sub ? { sub: identity.sub } : {}),
-        })
+        }))
       }
       const mailbox = env.MAILBOX.getByName(key)
       const harness = env.HARNESS.getByName(key)
@@ -91,16 +101,34 @@ export default {
         const body = await request.json().catch(() => ({})) as { id?: string; answer?: string }
         const id = body.id ?? ""
         const answer = body.answer ?? ""
-        if (!id || !answer) return Response.json({ error: "id and answer are required" }, { status: 400 })
+        if (!id || !answer) {
+          return withSecurityHeaders(Response.json({ error: "id and answer are required" }, { status: 400 }))
+        }
         const ok = await mailbox.answer(answerMatch[1]!, id, answer)
-        return Response.json({ ok })
+        return withSecurityHeaders(Response.json({ ok }))
       }
-      return harness.fetch(request)
+      return withSecurityHeaders(await harness.fetch(request))
     }
 
-    return serveAssets(request, env)
+    return withSecurityHeaders(await serveAssets(request, env))
   },
 } satisfies ExportedHandler<Env>
+
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers)
+  headers.set("X-Content-Type-Options", "nosniff")
+  headers.set("X-Frame-Options", "DENY")
+  headers.set("Referrer-Policy", "no-referrer")
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+  headers.set("Cross-Origin-Resource-Policy", "same-origin")
+  if (!headers.has("Content-Security-Policy")) {
+    headers.set(
+      "Content-Security-Policy",
+      "default-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    )
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
 
 const UI_COOKIE = "dsh_ui"
 

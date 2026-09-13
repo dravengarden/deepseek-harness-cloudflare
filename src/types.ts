@@ -9,6 +9,7 @@ export interface Env {
   BACKUP_BUCKET: R2Bucket
   DEEPSEEK_API_KEY: string
   DSH_CF_ACCESS_KEY: string
+  DSH_OVERLAY_KEY?: string
   DEEPSEEK_MODEL?: string
   LOCAL_DEV?: string
   BACKUP_BUCKET_NAME?: string
