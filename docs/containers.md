@@ -75,13 +75,10 @@ Backup runs on the official Container hook `onActivityExpired` (idle
 per model turn. `/checkpoint` calls the same `createBackup` path by hand.
 The handle lives in the Sandbox Durable Object store.
 
-Local `wrangler dev` uses `localBucket: true` (`LOCAL_DEV=1`) so backups go
-through the `BACKUP_BUCKET` binding instead of presigned URLs.
-
-Production backups need the official R2 setup: `BACKUP_BUCKET` binding,
-`BACKUP_BUCKET_NAME`, `CLOUDFLARE_ACCOUNT_ID`, and secrets
-`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`. TTL is 7 days (the documented
-long-backup example). Replace-latest deletes the previous
+Backups always use `localBucket: true` against the `BACKUP_BUCKET` binding
+(local `wrangler dev` and production). Presigned-URL tokens
+(`CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) are
+not required. TTL is 7 days. Replace-latest deletes the previous
 `backups/{id}/data.sqsh` and `meta.json`.
 
 A live R2 FUSE mount of `/data` is the other official persistence path. Do

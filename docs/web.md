@@ -1,113 +1,92 @@
-# Web surface and Cloudflare Access
+# Web surface
 
-Official `dsh web` (`@deepseek-ai/dsh-web-app`) is a Node GUI: process-token
-cookie, Typert RPC, loopback Host fence. That binary does not run on
-Workers. This host serves a Cloudflare-native Web surface over the same
-harness `/api` (sessions, SSE turns, commands, settings, ask-user).
+Official `dsh web` is a Node GUI: process-token cookie, Typert RPC,
+loopback Host fence, `window.__ModuleLoader__`. That binary does not run
+on Workers. This host serves two Workers Assets SPAs over the harness
+`/api`.
+
+It is not `chat.deepseek.com` and not `dsh-web-frontend`.
+
+## Surfaces
+
+| | Desktop `/` | Chat `/m` |
+|---|---|---|
+| Files | `public/index.html` `styles.css` `app.js` | `public/m.html` `mobile.css` `mobile.js` |
+| Layout | 56px rail, session sidebar, composer | Phone: column + drawer. iPad ≥768px: session column + thread |
+| Who | Pointer desktop | iPhone, iPad, Android phone |
+
+`run_worker_first` is true so the Worker can 302 `/` → `/m` before Assets
+serves `index.html`. iPadOS 13+ often sends a Macintosh User-Agent; the
+desktop HTML also checks `navigator.maxTouchPoints > 1` and replaces to
+`/m`. `/?ui=desktop` and the “Desktop site” link pin `dsh_ui=desktop`.
+
+Both SPAs share the auth cookie and `/api`. History replay uses settled
+events (`assistant/message`, tools), not live `assistant/chunk` rows.
+
+Shared chrome: sessions, fork, compact, stop, slash commands from
+`GET /api/commands`, permission preset, ask-user cards. Email /
+`identityKey` are display-only. The SPA does not send `identityKey` back
+and does not offer a tenant picker.
 
 ## Authentication
 
-### Production: Cloudflare Access (required)
+Two modes. They are mutually exclusive.
 
-This is Cloudflare's official way to put identity in front of a Worker.
-The Worker **must still validate** the JWT Access adds as
-`Cf-Access-Jwt-Assertion` (do not trust email headers).
+### Access key (default)
+
+If `TEAM_DOMAIN` and `POLICY_AUD` are unset, `POST /api/login` accepts
+`DSH_CF_ACCESS_KEY` and sets `dsh_cf` (HttpOnly, SameSite=Lax, Secure on
+HTTPS). This is what `wrangler dev` uses, and what a public `workers.dev`
+deploy uses until Access is configured.
+
+### Cloudflare Access (production identity)
 
 1. Deploy the Worker.
-2. In the Worker dashboard, enable **Cloudflare Access** (one-click Access
-   for Workers), or create a Zero Trust self-hosted application for the
-   hostname.
-3. Set Worker vars/secrets:
-   - `TEAM_DOMAIN` = `https://<team>.cloudflareaccess.com`
-   - `POLICY_AUD` = the application's AUD tag
-4. Add an Allow policy (your email, Google, GitHub, OTP, …).
+2. Enable Cloudflare Access on the Worker, or create a Zero Trust
+   self-hosted application for the hostname.
+3. Secret `TEAM_DOMAIN` = `https://<team>.cloudflareaccess.com`
+4. Secret `POLICY_AUD` = the application's AUD tag
+5. Allow policy (email, GitHub, OTP, …)
 
-The browser hits Access login first. The SPA then calls `/api/me` with the
-JWT already on the request. Sign out goes to
-`https://<team>.cloudflareaccess.com/cdn-cgi/access/logout`.
+The Worker verifies `Cf-Access-Jwt-Assertion` against the team JWKS. It
+does not trust unsigned email headers. `/api/login` returns 400. Sign-out
+goes to `https://<team>.cloudflareaccess.com/cdn-cgi/access/logout`.
 
-The Worker routes with `getByName(identityKey())`. Access decides *who may
-use* the app. The architecture target is one HarnessObject and one Sandbox
-per Access identity. The ship default is `IDENTITY_MODE` unset =
-`shared-owner` (`"owner"`), so production is not per-user until an operator
-flips.
-
-Local `/api/login` (access-key cookie), Cloudflare Access, and `/api/logout`
-are unchanged. There is no Typert RPC plane and no tenant picker.
-
-### Local: access key
-
-If `TEAM_DOMAIN` / `POLICY_AUD` are unset, `/api/login` accepts
-`DSH_CF_ACCESS_KEY` and sets an HttpOnly cookie. That path is for
-`wrangler dev` only.
+Access decides **who may use** the app. Tenant routing is still
+`identityKey()` — shared-owner until `IDENTITY_MODE=per-user`.
 
 ### `GET /api/me`
 
-Worker-only JSON (not a Durable Object). After JWT or access-key
-verification it returns `{ ok, model, email, auth, identityKey, identityMode }`
-and `sub` when the Access JWT has one. `LOCAL_DEV` does not gate these fields.
+Worker-only JSON, after JWT or cookie verification:
 
 | Field | Meaning |
 |---|---|
-| `ok` | `true` |
-| `model` | `DEEPSEEK_MODEL` or `deepseek-flash` (V4.1 Flash) |
-| `email` | Display only. Never a tenant id. |
+| `model` | `DEEPSEEK_MODEL` or `deepseek-flash` |
+| `email` | Display only. Never a tenant id |
 | `auth` | `"access"` or `"key"` |
-| `identityKey` | Durable Object name from `identityKey()`: `owner`, `local`, or `user:<sub>` |
-| `identityMode` | `"per-user"` only when `IDENTITY_MODE=per-user`; otherwise `"shared-owner"` (including unset) |
-| `sub` | Access subject, included when present |
+| `identityKey` | `"owner"`, `"local"`, or `user:<sub>` |
+| `identityMode` | `"per-user"` only when `IDENTITY_MODE=per-user`; else `"shared-owner"` |
+| `sub` | Access subject, when present |
 
-If `identityKey()` throws `IdentityError` (Access JWT missing `sub` in
-`per-user` mode), `/api/me` is 403 like other `/api` routes.
-
-The SPA shows `email` in the top bar and may show `identityKey` in the
-composer hint. It does not send `identityKey` back or offer a tenant
-picker. Cancel stays `POST /api/sessions/:id/cancel`.
+Missing `sub` in per-user mode is 403.
 
 ## Permissions
 
-The top-bar selector is the official dsh pair of presets:
+- **workspace-write** — Linux stays under `/workspace` and asks before
+  mutating (`bash`, writes, `str_replace` create/replace). Reads, glob,
+  grep, and `view` do not ask.
+- **danger-full-access** — still confined to Sandbox `/workspace`;
+  mutating tools do not ask.
 
-- `workspace-write` — Linux tools stay in `/workspace` and **ask** before
-  mutating (Allow / Deny via `ask_user_question`).
-- `danger-full-access` — still confined to the Sandbox `/workspace` (there
-  is no host filesystem to unlock); mutating tools do not ask.
+Plan mode refuses mutating tools. There is no Unix account model and no
+`users.yaml`.
 
-There is no Unix account model and no `users.yaml`.
+## HTTP API
 
-## Official GUI vs this host
+Worker-owned: `/api/login`, `/api/logout`, `/api/me`,
+`POST /api/sessions/:id/answer` (Mailbox). Everything else is
+`HarnessObject.fetch`.
 
-Official `dsh-web-frontend`, Typert, and Node `dsh web` are **rejected**.
-`@deepseek-ai/dsh-web-frontend` boots only after a Node host injects
-`window.__ModuleLoader__` and `window.__DSH_BOOT__`, then talks Typert RPC
-(`/api/remote.mux`, session.create/prompt, …). That host plane is not on
-Workers. A Typert adapter in the Worker would be a second harness.
-
-The GUI is two independent Workers Assets surfaces over the same `/api`:
-
-- **Desktop** `/` — `public/index.html` + `styles.css` + `app.js`. Official
-  dark tokens, 56px rail, session sidebar, composer. No mobile breakpoints.
-- **Mobile** `/m` — `public/m.html` + `mobile.css` + `mobile.js`. Independent
-  chat shell: visualViewport keyboard, dock Stop while streaming, empty
-  state, no session UUIDs in chrome. Not `chat.deepseek.com` and not
-  `dsh-web-frontend`.
-
-Phone UAs hitting `/` redirect to `/m`. `/?ui=desktop` and `/m` "Desktop
-site" pin a `dsh_ui` cookie. Both UIs share the access-key / Access cookie
-and harness APIs. It is not the React slot client.
-
-## UI
-
-The SPA mirrors the official web *surface*, not the Node app:
-
-- Session sidebar, fork, cancel, compact
-- Streaming assistant text and thinking
-- Tool calls, todos, ask-user prompts
-- Slash-command menu from `/api/commands`
-- Permission preset in the top bar
-- Email in the top bar (display only; not a tenant id)
-
-History replay uses settled events only (`assistant/message`, tools), not
-live `assistant/chunk` rows, so reopening a session does not duplicate
-streamed text.
-
+Turns are `POST /api/sessions/:id/turn` with SSE (`text/event-stream`).
+Cancel is `POST /api/sessions/:id/cancel`. Slash commands can also be
+sent as the turn message (`/compact`, `/plan`, `/help`, …).

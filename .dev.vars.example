@@ -2,12 +2,9 @@
 DEEPSEEK_API_KEY=
 DSH_CF_ACCESS_KEY=
 DEEPSEEK_MODEL=deepseek-flash
-# wrangler dev: official backup API uses the R2 binding instead of presigned URLs
+# wrangler dev only. Omit in production.
 LOCAL_DEV=1
-# Production backups also need CLOUDFLARE_ACCOUNT_ID plus R2 API token secrets:
-#   npx wrangler secret put R2_ACCESS_KEY_ID
-#   npx wrangler secret put R2_SECRET_ACCESS_KEY
-# CLOUDFLARE_ACCOUNT_ID=
-# Production identity (Cloudflare Access). Leave unset for wrangler dev.
+# Backups use the BACKUP_BUCKET binding (localBucket: true). No R2 API tokens.
+# Production identity (Cloudflare Access). Leave unset to use DSH_CF_ACCESS_KEY.
 # TEAM_DOMAIN=https://your-team.cloudflareaccess.com
 # POLICY_AUD=

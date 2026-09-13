@@ -3,15 +3,19 @@ type: docs_index
 description: DeepSeek Harness on Cloudflare Durable Objects.
 ---
 
-# Documentation index
+# Documentation
 
-Workers-native host for DeepSeek Harness. Read architecture first, then the
-root README for how to run it.
+Read the root [README](../README.md) to run it. Read
+[architecture](architecture.md) to understand it.
 
-- [`architecture.md`](architecture.md) — seams, runtime, Worker-is-required, and what is not ported
-- [`plugins.md`](plugins.md) — how to write plugins against this host
-- [`containers.md`](containers.md) — official Sandbox sleep, disk, backup/restore
-- [`core-gaps.md`](core-gaps.md) — official core that this runtime cannot take 1:1
-- [`web.md`](web.md) — Web surface and Cloudflare Access
-- [`design-cloudflare-native.md`](design-cloudflare-native.md) — product split, identity, mailbox (PRs 1–5)
-- [`../README.md`](../README.md) — run, auth, and project boundary
+| Doc | Role |
+|---|---|
+| [architecture.md](architecture.md) | Living system design: products, objects, turn, identity, security |
+| [web.md](web.md) | Desktop `/` and chat `/m`, auth, `/api` |
+| [containers.md](containers.md) | Sandbox sleep, ephemeral disk, backup/restore |
+| [plugins.md](plugins.md) | How to mount a Cordis plugin on this host |
+| [core-gaps.md](core-gaps.md) | Official DSH this runtime cannot take 1:1 |
+| [design-cloudflare-native.md](design-cloudflare-native.md) | Original redesign plan (PRs 1–5). Historical. |
+
+`AGENTS.md` at the repo root is for agents working in this tree, not for
+operators.

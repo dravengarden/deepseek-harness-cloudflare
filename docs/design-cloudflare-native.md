@@ -1,11 +1,16 @@
 # Cloudflare-native redesign of DeepSeek Harness on Cloudflare
 
+> Historical. This is the redesign plan that produced the current host
+> (Worker required, `identityKey()`, ControlMailbox, Sandbox sleep). The
+> living system description is [`architecture.md`](architecture.md). Do not
+> treat open questions in this file as current status.
+
 | Field | Value |
 |---|---|
 | **Title** | Cloudflare-native redesign of `deepseek-harness-cloudflare` |
 | **Author** | TBD |
 | **Date** | 2026-09-09 |
-| **Status** | Draft |
+| **Status** | Historical (PRs 1–5 landed; Access still optional) |
 | **Repo** | `git@github.com:dravengarden/deepseek-harness-cloudflare.git` |
 | **Code root** | `projects/deepseek-harness-cloudflare/` |
 | **Audience** | Senior engineers who already know this host (Cordis kernel, session log, Sandbox Linux, Workers SPA) |

@@ -31,7 +31,8 @@ snapshot every turn.
   never from an ad-hoc array that drops tool calls.
 - Session events are the source of truth; the in-memory kernel is rebuilt
   after hibernation.
-- Keep `DEEPSEEK_API_KEY` server-side. Production auth is Cloudflare Access
-  JWT (`TEAM_DOMAIN`, `POLICY_AUD`); local auth is `DSH_CF_ACCESS_KEY`.
+- Keep `DEEPSEEK_API_KEY` server-side. Auth is `DSH_CF_ACCESS_KEY` until
+  `TEAM_DOMAIN` + `POLICY_AUD` are set; then Cloudflare Access JWT.
+  Do not claim Access is configured if those secrets are unset.
 - Do not trust `Cf-Access-Authenticated-User-Email` without verifying the JWT.
 - `just verify` / `npm run verify` is the project gate.

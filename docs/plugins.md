@@ -1,9 +1,10 @@
 # Writing plugins
 
-This host is a Cordis application. A plugin is a function, class, or
+This host is a Cordis application. Runtime shape:
+[`architecture.md`](architecture.md). A plugin is a function, class, or
 `{ name, inject, apply }` object, the same shapes official DeepSeek Harness
-uses. Mount it from `composeHarness(..., { identityKey, plugins: [yours] })` or add it to
-`src/compose.ts`.
+uses. Mount it from `composeHarness(..., { identityKey, plugins: [yours] })`
+or add it to `src/compose.ts`.
 
 ```ts
 import type { Context } from "@deepseek-ai/cordis"

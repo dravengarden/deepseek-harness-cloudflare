@@ -1,177 +1,251 @@
 # Architecture
 
 DeepSeek Harness on Cloudflare is a **Workers-native host** for the harness
-model, not a container that runs `dsh` and not a Node compatibility shim.
+model. It is not a container that runs `dsh`, and it is not a Node
+compatibility shim.
 
 ```text
 Agent = Model + Harness
 Harness = kernel + plugins
 ```
 
-Official `dsh` is a Node CLI whose Loader, HMR, PTY, and process-local
-plugins assume a Node host. Those do not belong in the isolate. Bash and
-`/workspace` belong in the Sandbox container.
+Official `dsh` is a Node CLI. Its Loader, HMR, PTY, and process-local
+plugins assume a Node host. Those do not belong in a Worker isolate. Bash
+and `/workspace` belong in a container. The Cordis kernel belongs in an
+isolate that can hibernate and come back from a log.
 
-The kernel does. `@deepseek-ai/cordis` core is ESM + `Proxy` / inject /
-effects. Its only Node entry is `bin.js`. We import `Context` / `Service`
-and never the Loader. Plugins below the kernel are ours, shaped like the
-upstream seams so they can run in a Durable Object.
+That split is the whole design.
+
+## Cloudflare products
+
+Each product does one job. Nothing is a substitute for the Worker script.
+
+| Product | Role here |
+|---|---|
+| Worker | HTTP entry, auth, `identityKey()`, binding fan-out |
+| Workers Assets | Two SPAs (`/` and `/m`), `run_worker_first` so `/` can 302 |
+| Durable Object `HarnessObject` | Cordis tree, SQLite session log, agent loop |
+| Durable Object `ControlMailbox` | In-memory ask/answer waiters |
+| Durable Object `Sandbox` | Official `@cloudflare/sandbox` container |
+| R2 `BACKUP_BUCKET` | `/workspace` snapshots on idle sleep |
+| Cloudflare Access (optional) | Who may use the hostname; JWT still verified in the Worker |
+
+Access, Assets, Durable Objects, Containers, and R2 cannot bind each other
+without a Worker. Access is an identity reverse proxy, not an application
+runtime. Assets can serve `public/` without invoking the Worker;
+`run_worker_first` is **true** so the script can redirect phones and iPads
+before `index.html` is served.
 
 ## Runtime
 
 ```text
 browser
-  │  Access JWT or access-key cookie
+  │  access-key cookie  or  Cf-Access-Jwt-Assertion
   ▼
-Worker          entry + auth + binding fan-out
-  │             identityKey() → getByName
-  │             /answer → ControlMailbox
-  │             /cancel and other /api → HarnessObject
-  ▼
-HarnessObject   Durable Object + SQLite
-  │  compose() once per isolate lifetime
-  ▼
-@deepseek-ai/cordis 4.x  (official kernel; no Loader / HMR)
-  ├─ settings / session / agents
-  ├─ llm + llm-deepseek
-  ├─ web + search/fetch providers
-  ├─ tools + tool-web + tool-linux
-  ├─ execution → Cloudflare Sandbox (bash / /workspace)
-  ├─ systemPrompt sections + skills + time + briefing
-  ├─ commands + compaction (/compact)
-  ├─ schedule (Durable Object alarms)
-  ├─ questions → ControlMailbox ask / answer / abort
-  └─ agent-loop (deriveMessages, cancel)
+Worker
+  │  identityKey() → getByName(key) for all three objects
+  │
+  ├─ GET  / /m /assets     Assets (Worker may 302 `/` → `/m`)
+  ├─ POST /api/login       access-key cookie (disabled if Access is configured)
+  ├─ POST /api/sessions/:id/answer   ControlMailbox.answer
+  └─ other /api/*          HarnessObject.fetch
+         │
+         ▼
+    HarnessObject (SQLite)
+         composeHarness() once per isolate lifetime
+         │
+         ▼
+    @deepseek-ai/cordis 4.x
+         settings · sessions · agents
+         llm + llm-deepseek          api.deepseek.com  (deepseek-flash)
+         web + search / fetch
+         tools + linux / web / skill / todo / schedule / subagent / ask-user
+         execution ──► Sandbox (bash, /workspace, backup on sleep)
+         systemPrompt · skills · plan · permissions · compaction
+         schedule (setAlarm) · questions (mailbox RPC)
+         agent-loop (deriveMessages → stream → tools → turn/end)
 ```
 
-The Durable Object is the unit of identity and storage. The in-memory plugin
-tree is rebuilt after hibernation; the session log in SQLite is the source of
-truth. That matches DeepSeek Harness: model-visible facts are logged events.
+The Durable Object is the unit of identity and storage. Hibernation drops
+the in-memory plugin tree. The next request composes again and rebuilds
+model history from the append-only `events` table. That matches upstream
+DeepSeek Harness: **model-visible facts are logged events**.
 
 The Worker uses `fetch`, Web Crypto, Web Streams, and Durable Object SQL.
-`nodejs_compat` is enabled only because the official Sandbox SDK wrangler
-template requires it. Plugins still must not import `node:` APIs.
+`nodejs_compat` is on because the official Sandbox wrangler template
+requires it. Plugins still must not import `node:` APIs.
 
-## Worker
+## Identity
 
-A Worker script is **required**. Cloudflare Access, Workers Assets, Durable
-Objects, Containers, and R2 cannot bind each other.
+The browser never chooses a Durable Object id.
 
-| Belief | Reality |
-|---|---|
-| Access sits in front, so the Worker is optional | Access injects `Cf-Access-Jwt-Assertion`. Something must verify it, call `getByName` / `getSandbox`, and hold the bindings. |
-| The GUI is static, so the Worker is optional | Assets can serve `public/` without invoking the Worker. `/api/*`, login, and bindings still need the script. |
-| The Durable Object holds state, so the Worker is redundant | DO classes are exported from the Worker module and bound in `wrangler.jsonc`. |
+```text
+resolveIdentity(request)
+    Access JWT  →  { email, sub, source: "access" }
+    or cookie   →  { email: "owner", source: "key" }
+        │
+        ▼
+identityKey(identity, env)
+        │
+        ▼
+getByName(key)  ×  Harness + Mailbox + Sandbox
+```
 
-The Worker is entry + auth + binding fan-out. After `identityKey()`,
-`POST /api/sessions/:id/answer` goes to ControlMailbox; `POST
-/api/sessions/:id/cancel` and the rest of `/api` go to HarnessObject
-(`getByName(key)`). It is not the agent loop, not session SQLite, and not
-Linux. Those stay on `HarnessObject` and the Sandbox container. Official
-`dsh-web-frontend`, Typert, and Node `dsh web` are rejected; the GUI is the
-Workers Assets SPA.
-
-## Ask-user mailbox
-
-`ask_user_question` and permission Allow/Deny wait on a **ControlMailbox**
-Durable Object, not on HarnessObject. Waiters are in-memory Promises keyed by
-session id and question id. RPC arguments are strings and numbers only.
-
-| Method | Role |
-|---|---|
-| `ask(sessionId, id, timeoutMs)` | Park until answer, abort, or timeout |
-| `answer(sessionId, id, text)` | Resolve the waiter; `false` if none |
-| `abort(sessionId, id)` | Reject with `ask_user_question cancelled`; `false` if none |
-
-The mailbox is named with the same `identityKey` as HarnessObject (default
-`"owner"`). AbortSignal stays in the harness isolate: `QuestionService`
-listens to the turn signal and calls `abort(sessionId, id)`. Do not pass
-AbortSignal over Durable Object RPC.
-
-`POST /api/sessions/:id/cancel` stays on HarnessObject (`agentLoop.cancel`).
-
-## What we keep from DeepSeek Harness
-
-| Seam | DSH package | This host |
+| `IDENTITY_MODE` | Access JWT | Access-key cookie |
 |---|---|---|
-| Kernel | `@deepseek-ai/cordis` | Official package. Loader/include unused. |
-| Session | `dsh-session` | Append-only log, `deriveMessages()`, `fork()` |
-| Agents | `dsh-agent` | `ctx.agents`, Agent handle |
-| LLM | `dsh-llm` + `dsh-llm-deepseek` | Adapter seam + V4.1 Flash (`deepseek-flash`) |
-| Web | `dsh-web` family | Provider registry + official search/fetch |
-| Tools | `dsh-tools` + `dsh-tool-web` | Register/unwind + execute events |
-| Prompt | `dsh-system-prompt` | Ordered sections plugins can add |
-| Commands | `dsh` command registry | `/compact` and extras |
-| Settings | `dsh-settings` | SQLite documents |
-| Schedule | `dsh-schedule` | DO `setAlarm` instead of Node timers |
-| Skills | `dsh-skill` | Catalog + prompt section |
-| Compaction | `dsh-compaction` | Summary event + `/compact` |
-| Loop | `dsh-agent-loop` | Turn/step from derived history |
-| Linux | E2B / local bash | Official `@cloudflare/sandbox` |
-| Skills | `dsh-skill` + filesystem + `skill` tool | Catalog, loader, `/name`, `/workspace` SKILL.md |
-| Subagent | `dsh-subagent` spawn/fork | In-process child session, max depth 3 |
-| Todo | `todo_write` | Session log `todo/write` |
-| Schedule tools | `schedule_*` | DO alarms |
-| Plan | `dsh-plan-mode` | `/plan` + `exit_plan_mode` |
-| Ask user | `ask_user_question` | ControlMailbox `ask` / `answer` / `abort` |
+| unset or `shared-owner` | `"owner"` | `"owner"` |
+| `per-user` | `user:<sub>` | `"local"` |
 
-## What we do not port
+Unset is **not** per-user. Email is display-only; production per-user uses
+Access `sub` and fail-closes if `sub` is missing. `LEGACY_OWNER_SUB` /
+`LEGACY_OWNER_EMAIL` can pin one Access principal to the old `"owner"`
+SQLite in the same deploy as the flip.
 
-- `dsh` CLI, profiles, YAML Loader, HMR
-- PTY, Landlock, LSP, code-runtime, MCP stdio, workflow/ralph, dynamic cordis
-- official Web UI plugin roster
-- `node:vm` dynamic plugins
-- continuable/background jobs (see [`core-gaps.md`](core-gaps.md))
+`max_instances` is 5 concurrent **running** containers, not registered
+users. Sleeping sandboxes do not take a slot. A sixth concurrent Linux
+start fails tools with a stable capacity string.
 
-Linux bash and `/workspace` run in Cloudflare Sandbox, the same role E2B
-plays upstream — not the host of the loop. See
-[`containers.md`](containers.md).
+## Session log
 
-## Turn flow
+```sql
+sessions(id, title, created_at, parent_id)
+events(session_id, seq, type, payload, created_at)
+```
+
+`session.deriveMessages()` is the only history the model sees. Do not build
+an ad-hoc message array that drops tool calls. Compaction inserts a
+`compaction/summary` event; later derives skip events through that seq.
+
+Fork copies events up to a turn boundary and refuses to fork during an
+open turn. Delete removes the session row and its events. List is capped
+at 200.
+
+## Turn
 
 ```text
 turn/start
-  append user/message
-  assemble system prompt + tool schemas
-  loop:
-    llm/stream → assistant/chunk*
-    tool/call* → tools/execute → tool/result*
+  user/message
+  inject named /skills if the prompt starts with /name
+  loop (max 24 steps):
+    assemble system prompt + tool schemas
+    llm/stream → assistant/thinking*  assistant/chunk*  tool/call*
     if no tool calls: break
+    tools/execute → permission gate → tool/result
   assistant/message
 turn/end
 ```
 
-`web_search` is a model-facing tool. Its provider calls DeepSeek's
-Anthropic-compatible Messages API with `web_search_20250305` (server-side
-search, same key as the chat model). `web_fetch` is ordinary `fetch` with
-SSRF checks. The agent loop never sees Node.
+Cancel is `POST /api/sessions/:id/cancel` → `agentLoop.cancel` in the
+Harness isolate. `AbortSignal` is not RPC-serializable; it is never passed
+to Sandbox or Mailbox. Linux `exec` uses a 120s timeout instead.
 
-## Auth
+`web_search` calls DeepSeek's Anthropic-compatible Messages API with
+`web_search_20250305` (same API key as chat). `web_fetch` is ordinary
+`fetch` with SSRF checks. The loop never sees Node.
 
-Production authenticates with **Cloudflare Access**. The Worker validates
-`Cf-Access-Jwt-Assertion` against the team JWKS (`TEAM_DOMAIN` +
-`POLICY_AUD`). Local `wrangler dev` falls back to `DSH_CF_ACCESS_KEY`.
+## Ask-user mailbox
 
-The browser never chooses the Durable Object id. The Worker calls
-`getByName(identityKey())`. Access is the identity gate. Production is not
-per-user until an operator sets `IDENTITY_MODE=per-user`.
+`ask_user_question` and permission Allow/Deny wait on **ControlMailbox**,
+not on HarnessObject. Waiters are in-memory Promises. RPC arguments are
+strings and numbers only.
 
-The architecture *target* is one HarnessObject and one Sandbox per Access
-identity (`identityKey()` in `src/identity.ts`: `user:<sub>` when
-`IDENTITY_MODE=per-user`; local access-key → `"local"`). The *ship default*
-is `IDENTITY_MODE` unset = `shared-owner` so existing owner SQLite is not
-orphaned. Email is display-only; production per-user uses Access `sub`.
-`max_instances` is 5 concurrent *running* containers, not user count;
-sleeping sandboxes do not count. See [`web.md`](web.md).
+| RPC | Role |
+|---|---|
+| `ask(sessionId, id, timeoutMs)` | Park until answer, abort, or timeout |
+| `answer(sessionId, id, text)` | Resolve; `false` if none |
+| `abort(sessionId, id)` | Reject `ask_user_question cancelled` |
 
-## Persistence
+The mailbox is named with the same `identityKey` as HarnessObject. The
+turn's `AbortSignal` stays in the harness isolate and calls `abort(...)`.
+Turns that are waiting on ask-user are **not** resumed across hibernation
+(deferred).
 
-```sql
-sessions(id, title, created_at)
-events(session_id, seq, type, payload, created_at)
-```
+## Linux
 
-Hibernation drops the kernel. The next request composes plugins again and
-reads history from `events`. `/workspace` is snapshotted on Sandbox
-`onActivityExpired` (official idle stop) into the Sandbox Durable Object
-store, then restored after the next sleep.
+Sandbox is the isolation boundary (the E2B role upstream). There is no
+Landlock policy in the Worker.
+
+- Image: `docker.io/cloudflare/sandbox:0.12.9`, `instance_type: basic`
+- Id: `getSandbox(env.Sandbox, identityKey, { sleepAfter: "10m" })`
+- Disk is ephemeral. `onActivityExpired` snapshots `/workspace` with
+  `createBackup({ localBucket: true })`, stores the handle on the Sandbox
+  DO, then `stop()`. Next start restores only if `/workspace/.dsh-cf` is
+  missing.
+- Mutating tools under `workspace-write` ask Allow/Deny. `glob`, `grep`,
+  and `str_replace_editor` `view` do not. Plan mode refuses mutating tools.
+
+See [`containers.md`](containers.md).
+
+## Web surfaces
+
+Official `dsh-web-frontend` needs Node `__ModuleLoader__` and Typert RPC.
+This host does not have that plane. The GUI is two Assets SPAs over `/api`.
+
+| Surface | Files | Layout |
+|---|---|---|
+| Desktop `/` | `index.html` `styles.css` `app.js` | 56px rail, sidebar, composer |
+| Chat `/m` | `m.html` `mobile.css` `mobile.js` | Phone: single column + drawer. Tablet (≥768px): session column + thread |
+
+Routing: iPhone / iPad / Android phone UAs, or a client-side iPadOS check
+(`Macintosh` + `maxTouchPoints > 1`), send `/` to `/m`. `/?ui=desktop`
+pins `dsh_ui=desktop`. Both SPAs share the auth cookie.
+
+HTTP API (HarnessObject unless noted):
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/login` | Worker; access-key cookie |
+| POST | `/api/logout` | Worker |
+| GET | `/api/me` | Worker; `{ model, email, auth, identityKey, identityMode }` |
+| GET/POST | `/api/sessions` | List / create |
+| GET/DELETE | `/api/sessions/:id` | Replay events / delete |
+| POST | `/api/sessions/:id/turn` | SSE `text/event-stream` |
+| POST | `/api/sessions/:id/cancel` | Abort in-flight turn |
+| POST | `/api/sessions/:id/fork` | |
+| POST | `/api/sessions/:id/command` | `/compact` and others |
+| POST | `/api/sessions/:id/answer` | Worker → Mailbox |
+| GET/PUT | `/api/settings` | Permission preset |
+| GET | `/api/commands` | Slash menu |
+
+See [`web.md`](web.md).
+
+## Plugin host
+
+`composeHarness(env, sql, { identityKey, plugins })` mounts the tree in
+`src/compose.ts`. Third-party plugins are Cordis modules of the same
+shapes official DSH uses (`apply`, `inject`, `ctx.tools.register`, …).
+They must not import `node:`. There is no YAML Loader and no
+`dsh plugin add`.
+
+Seams: [`plugins.md`](plugins.md). Non-goals: [`core-gaps.md`](core-gaps.md).
+
+## Security
+
+- Secrets stay in Wrangler secrets / `.dev.vars`. Never in Assets.
+- Access JWT is verified against team JWKS (`TEAM_DOMAIN`, `POLICY_AUD`).
+  Unsigned `Cf-Access-Authenticated-User-Email` is ignored.
+- Access-key cookie is HttpOnly, SameSite=Lax, Secure on HTTPS.
+- `web_fetch` rejects credentials, localhost, and IP literals.
+- Linux cannot see the host filesystem; it is confined to Sandbox
+  `/workspace`.
+- `preview_urls` is false. Responses set CSP, `X-Frame-Options: DENY`,
+  `nosniff`, `Referrer-Policy: no-referrer`.
+
+Cloudflare Access in front of the hostname is the production identity
+gate. Until `TEAM_DOMAIN` / `POLICY_AUD` are set, the access-key cookie
+is the gate. Anyone who can reach the Worker URL and the key can use the
+shared-owner object.
+
+## What we refuse
+
+These are not “not yet.” They assume a Node process or a long-lived child:
+
+- Official `dsh web` / Typert / `dsh-web-frontend`
+- YAML Loader, HMR, `dsh plugin add`
+- PTY / persistent bash, Landlock, LSP, MCP stdio
+- Background jobs, continuable subagents, ACP / Codex / Claude children
+- Workflow / ralph / `node:vm` dynamic plugins
+- Vision / `read_image` until an image route exists
+
+The original product-split plan that produced this shape is
+[`design-cloudflare-native.md`](design-cloudflare-native.md) (historical).

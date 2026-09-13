@@ -1,9 +1,8 @@
 # Core features that this host cannot take 1:1
 
-Portable DeepSeek Harness core is implemented on this Worker: session log,
-loop, llm, web, tools, skills (catalog + `skill` + `/name` + workspace
-`SKILL.md`), subagent (in-process spawn/fork), todo, schedule tools, plan
-mode, ask-user, auto-compact, linux sandbox.
+These are **non-goals**, not a backlog. Portable core that *does* run here
+is listed in the [README](../README.md) and designed in
+[architecture.md](architecture.md).
 
 These official core pieces **do not fit this runtime**. Please review whether
 to drop, stub, or wait for a later host.

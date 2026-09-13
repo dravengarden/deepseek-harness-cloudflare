@@ -1,8 +1,8 @@
 # DeepSeek Harness on Cloudflare
 
-A **Workers-native host** for the DeepSeek Harness model: everything is a
-plugin, the session log is the source of truth, and Linux runs in an official
-Cloudflare Sandbox — not in Node, and not inside `npx @deepseek-ai/dsh`.
+A **Workers-native host** for DeepSeek Harness. The loop is a Cordis plugin
+tree. The session log is the source of truth. Linux runs in Cloudflare
+Sandbox. None of that is Node, and none of it is `npx @deepseek-ai/dsh`.
 
 ```text
 Agent = Model + Harness
@@ -10,134 +10,83 @@ Harness = kernel + plugins
 ```
 
 The kernel is official [`@deepseek-ai/cordis`](https://www.npmjs.com/package/@deepseek-ai/cordis).
-Every other seam is implemented here against `fetch`, Durable Object SQLite,
-and `@cloudflare/sandbox`.
+Every other seam — session, LLM, tools, skills, schedule, the agent loop —
+is implemented here against `fetch`, Durable Object SQLite, and
+[`@cloudflare/sandbox`](https://developers.cloudflare.com/sandbox/).
 
-This is a teaching / demo-grade port of the **harness core** onto Cloudflare.
-It is not a drop-in replacement for the official CLI, Web GUI, or plugin
-marketplace.
+This is a teaching / demo-grade port of the **harness core**. It is not a
+drop-in replacement for the official CLI, Web GUI, or plugin marketplace.
 
-## Architecture
+## How it is put together
 
 ```text
 browser
-  │  Cloudflare Access (production) or access-key cookie (wrangler dev)
+  │  access-key cookie, or Cloudflare Access JWT
   ▼
-Worker                 entry + auth + binding fan-out; /api/* → Durable Object
+Worker                 HTTP entry, auth, identityKey() → getByName
   │
-  ▼
-HarnessObject          Durable Object + SQLite
-  │  composeHarness() once per isolate lifetime
-  ▼
-@deepseek-ai/cordis 4.x
-  ├─ settings / session / agents
-  ├─ llm + llm-deepseek          api.deepseek.com  (V4.1 Flash, `deepseek-flash`)
-  ├─ web + search / fetch        native search + public HTTP (SSRF-gated)
-  ├─ tools + linux / web / skill / todo / schedule / subagent / ask-user
-  ├─ execution → Sandbox DO      bash, /workspace, createBackup on idle
-  ├─ systemPrompt, skills, plan, permissions, compaction
-  ├─ schedule                    Durable Object alarms
-  └─ agent-loop                  deriveMessages → stream → tools → turn/end
-
-ControlMailbox         ask / answer / abort waiters (same identityKey as Harness)
-Sandbox                official @cloudflare/sandbox container
-                       sleepAfter 10m, backup /workspace to R2 on idle
+  ├── Assets           desktop `/`  ·  phone/tablet `/m`
+  ├── HarnessObject    Cordis tree + SQLite session log
+  ├── ControlMailbox   ask_user_question waiters
+  └── Sandbox          Linux container, /workspace, sleep after 10m
 ```
 
-A **Worker script is required**. Access, Assets, Durable Objects, Containers,
-and R2 cannot bind each other. Access is an identity reverse proxy, not an
-application runtime. Assets can serve `public/` without invoking the Worker
-(`run_worker_first` defaults to false); `/api/*` and every binding still
-need the script. Durable Object classes are exported from the Worker module.
-The Worker is entry + auth + binding fan-out, not the agent loop (that lives
-on `HarnessObject`; Linux lives in the Sandbox).
+A Worker script is **required**. Access, Assets, Durable Objects, Containers,
+and R2 cannot bind each other. The Worker is not the agent loop. The loop
+lives on `HarnessObject`. Bash lives in the Sandbox.
 
-The Worker derives `identityKey()` after auth and addresses Harness,
-Mailbox, and Sandbox with `getByName(key)`. The browser never picks a
-Durable Object id. The architecture *target* is one HarnessObject and one
-Sandbox per Access identity. The *ship default* is `IDENTITY_MODE` unset
-(`shared-owner`) so existing owner SQLite is not orphaned — routing is
-wired, but production still shares `"owner"` until an operator flips to
-`per-user`.
+The browser never picks a Durable Object id. After auth, the Worker calls
+`getByName(identityKey())` for Harness, Mailbox, and Sandbox together.
 
-The GUI is the Workers Assets SPA in `public/`. Official
-`dsh-web-frontend`, Typert, and Node `dsh web` are rejected — they need a
-Node host plane this runtime does not have. There is no Typert RPC
-(`/api/remote.mux`). Local `/api/login`, Cloudflare Access, and `/api/logout`
-are unchanged.
+Default identity is **shared-owner** (`IDENTITY_MODE` unset → `"owner"`).
+Per-user objects (`user:<sub>`) exist in code; they turn on only when an
+operator sets `IDENTITY_MODE=per-user`.
 
-`GET /api/me` returns `{ ok, model, email, auth, identityKey, identityMode }`
-and `sub` when the Access JWT has one. `identityKey` is the Durable Object
-name (`owner` / `local` / `user:<sub>`). `identityMode` is `"per-user"` only
-when `IDENTITY_MODE=per-user`; otherwise `"shared-owner"` (unset is not
-per-user). Email is display-only; the SPA must not treat it as a tenant id.
+Full design: [`docs/architecture.md`](docs/architecture.md).
 
-Hibernation drops the in-memory plugin tree. The next request composes again
-and rebuilds model history from the append-only `events` table. Container
-disk is ephemeral; `/workspace` is restored from the last Sandbox
-`DirectoryBackup` handle after sleep.
+## Surfaces
 
-More detail: [`docs/architecture.md`](docs/architecture.md),
-[`docs/containers.md`](docs/containers.md), [`docs/web.md`](docs/web.md),
-[`docs/plugins.md`](docs/plugins.md),
-[`docs/design-cloudflare-native.md`](docs/design-cloudflare-native.md).
+Two independent SPAs share one `/api`. Official `dsh-web-frontend`, Typert,
+and Node `dsh web` are not hosted.
 
-## What is in this port
+| URL | Who | What |
+|---|---|---|
+| `/` | desktop | Workbench: rail, session sidebar, composer |
+| `/m` | iPhone, iPad, Android phones | Chat shell. iPad (≥768px) keeps a persistent session column |
+| `/?ui=desktop` | anyone | Pin the workbench (`dsh_ui` cookie) |
 
-| Seam | Status |
+Phones and iPads hitting `/` redirect to `/m`. History replay uses settled
+events only, so reopening a session does not duplicate streamed text.
+
+## What this port includes
+
+| Seam | Notes |
 |---|---|
-| Official Cordis kernel (no Loader / HMR) | Yes |
-| Session log, `deriveMessages()`, fork | Yes |
-| DeepSeek V4.1 Flash (`deepseek-flash`) + thinking + tools | Yes |
-| `web_search` / `web_fetch` | Yes |
-| Skills: catalog, `skill` tool, `/name`, bundled + `/workspace` SKILL.md | Yes |
-| Subagent: in-process spawn / fork, max depth 3 | Yes |
-| Todo, schedule tools, plan mode, ask-user | Yes |
-| Auto-compact on long history | Yes |
-| Linux via official Sandbox (`bash`, files, glob/grep/str_replace) | Yes |
-| `/workspace` persistence via `createBackup` on `onActivityExpired` | Yes |
-| Permissions: `workspace-write` (ask) / `danger-full-access` (never ask) | Yes |
-| Web UI: Workers Assets SPA (workbench layout on `/api`) | Yes (not `dsh-web-frontend` / Typert / Node `dsh web`) |
-| Plugin host: `composeHarness(env, sql, { identityKey, plugins })` | Yes |
-| Identity routing (`getByName(identityKey())`) | Yes (default shared-owner `"owner"`; `per-user` is an operator flip) |
+| Cordis 4.x | Official kernel. No YAML Loader, no HMR |
+| Session log | Append-only SQLite, `deriveMessages()`, fork, delete |
+| Model | DeepSeek V4.1 Flash (`deepseek-flash`), thinking, tools |
+| Web | `web_search` (DeepSeek server-side search), `web_fetch` (SSRF-gated) |
+| Linux | `bash`, files, glob/grep, `str_replace_editor` in `/workspace` |
+| Workspace | `createBackup` on idle sleep, restore on next start |
+| Skills | Catalog, `skill` tool, `/name`, bundled + `/workspace` SKILL.md |
+| Subagent | In-process spawn / fork, max depth 3 |
+| Todo, schedule, plan, ask-user | Schedule uses Durable Object alarms |
+| Permissions | `workspace-write` (ask) / `danger-full-access` (never ask) |
+| Commands | `/help` `/compact` `/plan` `/permission` `/workspace` `/checkpoint` |
 
-## What is not migrated
-
-Official `dsh web`, the YAML Loader, and several core packages assume a Node
-process. They are **not** in this repository. Full table:
-[`docs/core-gaps.md`](docs/core-gaps.md).
-
-| Official piece | Why it is absent |
-|---|---|
-| `@deepseek-ai/dsh-web-app` / `dsh-web-frontend` / Typert / Node `dsh web` | Node GUI host plane. This repo ships a Workers Assets SPA over `/api` instead |
-| `dsh` CLI, profiles, `dsh plugin add`, HMR | No Node host, no YAML Loader |
-| PTY / `terminal_*` / persistent bash | Sandbox can `exec`, not a product PTY |
-| Landlock / `ctx.sandbox` policy | Isolation is the Cloudflare container |
-| LSP | Long-lived language server |
-| MCP stdio | No child processes in the isolate (HTTP MCP could come later) |
-| Background jobs / continuable subagents | DO hibernation drops in-memory jobs |
-| ACP / Codex / Claude Code / dsh-sdk children | Separate Node CLIs |
-| Workflow / ralph / `run_code` PTC | Worker threads / `node:vm` |
-| Dynamic `cordis_*` plugins | Untrusted package load |
-| PowerShell, vision / `read_image`, agent teams, goals | Not on this runtime |
-
-Do not expect `npx @deepseek-ai/dsh web` plugins to `dsh plugin add` onto this
-Worker. Third-party plugins must be Cordis modules mounted from
-`src/compose.ts`.
+What official DSH does that this runtime cannot take 1:1 is listed in
+[`docs/core-gaps.md`](docs/core-gaps.md) (PTY, LSP, MCP stdio, Loader,
+background jobs, vision, …). Third-party `dsh plugin add` packages do not
+mount here. Write a Cordis module and add it in `src/compose.ts`.
 
 ## Requirements
 
-- Node 22+ (for Wrangler and tests only; the harness does not run on Node)
-- A [Workers Paid](https://developers.cloudflare.com/workers/platform/pricing/)
-  account (Containers / Sandbox)
-- Docker, for `wrangler dev` and for deploying the Sandbox image
+- Node 22+ (Wrangler and tests only; the harness does not run on Node)
+- [Workers Paid](https://developers.cloudflare.com/workers/platform/pricing/) (Containers)
+- Docker, for `wrangler dev` and for pushing the Sandbox image
 - A DeepSeek API key
-- For production backups: an R2 bucket and an R2 API token
-- For production identity: Cloudflare Zero Trust / Access
 
 ## Setup
-
-### 1. Clone and install
 
 ```bash
 git clone git@github.com:dravengarden/deepseek-harness-cloudflare.git
@@ -146,159 +95,85 @@ npm install
 cp .dev.vars.example .dev.vars
 ```
 
-Fill `.dev.vars` (never commit this file):
+Fill `.dev.vars` (never commit it):
 
 | Variable | Local | Production |
 |---|---|---|
 | `DEEPSEEK_API_KEY` | required | `wrangler secret put` |
-| `DSH_CF_ACCESS_KEY` | required (long random string) | unused if Access is on |
-| `DEEPSEEK_MODEL` | optional, default `deepseek-flash` (V4.1 Flash) | optional |
-| `LOCAL_DEV=1` | required so backups use the R2 binding | omit |
-| `TEAM_DOMAIN` | omit | `https://<team>.cloudflareaccess.com` |
-| `POLICY_AUD` | omit | Access application AUD |
-| `CLOUDFLARE_ACCOUNT_ID` | omit | required for production backups |
-| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | omit | R2 API token with object read/write |
+| `DSH_CF_ACCESS_KEY` | required, long random string | same, until Access is on |
+| `DEEPSEEK_MODEL` | optional, default `deepseek-flash` | optional |
+| `LOCAL_DEV=1` | set | omit |
+| `TEAM_DOMAIN` / `POLICY_AUD` | omit | set after you create Access |
 | `IDENTITY_MODE` | omit (shared-owner) | omit until you flip to `per-user` |
-| `LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` | omit | set in the same deploy as `per-user` if you need the old `"owner"` SQLite |
 
-### 2. Local development
+### Local
 
-Start Docker, then:
+Docker must be running. Rootless / NixOS often need:
 
 ```bash
-# Rootless Docker / NixOS often need these:
-# export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
-# export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
+export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 npx wrangler dev
-# or: just dev
 ```
 
-Open the printed URL, enter `DSH_CF_ACCESS_KEY` from `.dev.vars`, start a
-session. The first Sandbox start builds `Dockerfile`
-(`FROM docker.io/cloudflare/sandbox:0.12.9`) and can take a few minutes.
+Open the printed URL, paste `DSH_CF_ACCESS_KEY`, start a session. The first
+Linux call builds `Dockerfile` (`FROM docker.io/cloudflare/sandbox:0.12.9`)
+and can take a few minutes. Research-only turns (`web_search` / `web_fetch`)
+do not start the container.
 
 ```bash
 npm run verify
 ```
 
-Linux tools need the container. Research-only turns (`web_search` /
-`web_fetch`) do not start it.
-
-### 3. Production deploy
-
-Create the backup bucket once:
+### Production
 
 ```bash
 npx wrangler r2 bucket create dsh-cf-workspace-backups
-```
-
-Put secrets (do not put them in `wrangler.jsonc`):
-
-```bash
 npx wrangler secret put DEEPSEEK_API_KEY
-npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
-npx wrangler secret put R2_ACCESS_KEY_ID
-npx wrangler secret put R2_SECRET_ACCESS_KEY
-```
-
-Set Access vars after you create the Access application:
-
-```bash
-npx wrangler secret put TEAM_DOMAIN
-npx wrangler secret put POLICY_AUD
-```
-
-Deploy (Docker must be running so Wrangler can push the container image):
-
-```bash
+npx wrangler secret put DSH_CF_ACCESS_KEY
 npx wrangler deploy
 ```
 
-### 4. Cloudflare Access
+Backups use the `BACKUP_BUCKET` binding (`localBucket: true`). You do not
+need R2 API tokens. `preview_urls` is off. `workers.dev` is on by default.
 
-1. In the Worker dashboard, enable **Cloudflare Access** (one-click Access
-   for Workers), or create a Zero Trust self-hosted application for the
-   hostname.
-2. Allow your identity provider (email, GitHub, OTP, …).
-3. Copy the application's **AUD** tag and team domain into `POLICY_AUD` and
-   `TEAM_DOMAIN`.
-4. The Worker validates `Cf-Access-Jwt-Assertion` against the team JWKS. It
-   does not trust unsigned email headers.
+Until `TEAM_DOMAIN` and `POLICY_AUD` are set, `/api/login` accepts the
+access-key cookie. After they are set, `/api/login` is disabled and the
+Worker validates `Cf-Access-Jwt-Assertion` against the team JWKS. It never
+trusts unsigned email headers.
 
-Sign-out redirects to `https://<team>.cloudflareaccess.com/cdn-cgi/access/logout`.
+## Identity
 
-Until `TEAM_DOMAIN` and `POLICY_AUD` are set, the app uses the local access
-key. After they are set, `/api/login` is disabled.
+`identityKey()` is the Durable Object name:
 
-### 5. Permissions in the UI
+| Mode | Access JWT | Access key |
+|---|---|---|
+| unset / `shared-owner` | `"owner"` | `"owner"` |
+| `per-user` | `user:<sub>` | `"local"` |
 
-- **workspace-write** — Linux tools stay under `/workspace` and ask Allow /
-  Deny before mutating.
-- **danger-full-access** — still confined to the Sandbox `/workspace` (there
-  is no host disk to unlock); mutating tools do not ask.
+Email is display-only. Production per-user uses Access `sub`. Optional
+`LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` keep one principal on the old
+`"owner"` SQLite when you flip. Rollback: unset `IDENTITY_MODE` and
+redeploy. `user:*` objects hibernate unused; they are not copied back.
 
-## Configuration notes
-
-- `nodejs_compat` is on because the official Sandbox wrangler template
-  requires it. Plugins must still not import `node:` APIs.
-- Sandbox `instance_type` is `basic` (1 GiB), not hello-world `lite`.
-- `sleepAfter` is `10m`. `keepAlive` is off. Billing stops when the
-  container sleeps.
-- `/workspace` backups run on the official `onActivityExpired` hook (one
-  snapshot per sleep), not on every model turn. `/checkpoint` forces one.
-- Default backup TTL is 7 days. Production restore is a FUSE overlay that
-  vanishes on the next sleep and is restored again from the stored handle.
-- `IDENTITY_MODE` unset (or `shared-owner`) keeps the `"owner"` object.
-  `per-user` splits to `user:<sub>` (Access) and `"local"` (access-key).
-  Optional `LEGACY_OWNER_SUB` / `LEGACY_OWNER_EMAIL` alias one Access
-  principal back to `"owner"`.
-- First deploy keeps `IDENTITY_MODE` unset. To flip to per-user:
-  1. Confirm whether `"owner"` still has sessions you need (`GET /api/sessions`).
-  2. If yes, set `LEGACY_OWNER_SUB` (preferred) or `LEGACY_OWNER_EMAIL` in
-     the same deploy as `IDENTITY_MODE=per-user`.
-  3. If that SQLite is disposable, set `IDENTITY_MODE=per-user` without an
-     alias and accept empty sessions.
-- Local `wrangler dev` with `per-user` + access-key routes to `"local"`, not
-  `"owner"`. That is a **breaking local change** versus today's `"owner"`
-  SQLite. Stay unset/`shared-owner` to keep local sessions, or treat them
-  as disposable.
-- Container `max_instances` is **5**: concurrent *running* containers, not
-  registered users. Sleeping sandboxes do not count.
-- To roll back per-user: unset `IDENTITY_MODE` (or set `shared-owner`) and
-  redeploy. Routing returns to `"owner"`. `user:*` objects hibernate unused;
-  owner SQLite is unchanged. Sessions created under `user:<sub>` while
-  per-user was on are not copied back.
+`max_instances` is **5 concurrent running containers**, not user count.
+Sleeping sandboxes do not take a slot.
 
 ## Operations
-
-### Logs
 
 ```bash
 npx wrangler tail
 ```
 
-Worker, HarnessObject, ControlMailbox, and Sandbox emit one JSON line per
-event with `level`, `msg`, `identityKey`, `sessionId`, `route`, `doClass`,
-`elapsedMs`, and `err`. They never log `Cf-Access-Jwt-Assertion`, access
-keys, or `DEEPSEEK_API_KEY`. Tool results are truncated.
+Logs are one JSON line with `level`, `msg`, `identityKey`, `sessionId`,
+`route`, `doClass`, `elapsedMs`, `err`. JWTs, access keys, and
+`DEEPSEEK_API_KEY` are never logged. Tool results are truncated.
 
-Lines worth grepping: Worker 401, `composeHarness after hibernation`, turn
-start/end/cancel, ask timeout/cancelled, sandbox restore hit/miss, backup
-success/fail, sandbox capacity, schedule alarm, identity route to a
-`user:` key (`mode=per-user`).
+Useful `msg` values: `unauthorized`, `composeHarness after hibernation`,
+turn start/end/cancel, ask timeout/cancelled, sandbox restore hit/miss,
+backup success/fail, sandbox capacity, schedule alarm.
 
-Cloudflare Workers request/CPU/error metrics plus the Containers dashboard
-are enough. This host does not write Workers Analytics Engine.
-
-### Containers vs `max_instances`
-
-`max_instances` (5) is concurrent *running* containers, not registered
-users. Sleeping sandboxes do not consume a slot. If the dashboard instance
-count is stuck at 5, new Linux tools fail with the capacity error until
-another workspace sleeps. Raising the cap is safe; lowering it below
-currently-running instances can fail new starts — raise or wait.
-
-## Develop a plugin
+## Plugins
 
 ```ts
 import type { Context } from "@deepseek-ai/cordis"
@@ -322,10 +197,21 @@ export function apply(ctx: Context) {
 }
 ```
 
-Mount it from `composeHarness(env, sql, { identityKey, plugins: [acme] })`. See
-[`docs/plugins.md`](docs/plugins.md).
+Mount from `composeHarness(env, sql, { identityKey, plugins: [acme] })`.
+Seams: [`docs/plugins.md`](docs/plugins.md).
+
+## Documentation
+
+| Doc | Role |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | System design: products, objects, turn, identity |
+| [`docs/web.md`](docs/web.md) | SPA surfaces, auth, `/api` |
+| [`docs/containers.md`](docs/containers.md) | Sandbox sleep, disk, backup/restore |
+| [`docs/plugins.md`](docs/plugins.md) | How to write plugins |
+| [`docs/core-gaps.md`](docs/core-gaps.md) | Official DSH that this runtime cannot take 1:1 |
+| [`docs/design-cloudflare-native.md`](docs/design-cloudflare-native.md) | Original redesign plan (historical) |
 
 ## License
 
-MIT. Cordis and the Sandbox SDK are their own licenses. This project is not
-an official DeepSeek or Cloudflare product.
+MIT. Cordis and the Sandbox SDK have their own licenses. This project is
+not an official DeepSeek or Cloudflare product.
