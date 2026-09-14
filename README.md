@@ -1,5 +1,7 @@
 # DeepSeek Harness on Cloudflare
 
+**English** | [中文](README.zh.md)
+
 A **Workers-native host** for DeepSeek Harness. The loop is a Cordis plugin
 tree. The session log is the source of truth. Linux runs in Cloudflare
 Sandbox. None of that is Node, and none of it is `npx @deepseek-ai/dsh`.
@@ -78,6 +80,22 @@ What official DSH does that this runtime cannot take 1:1 is listed in
 [`docs/core-gaps.md`](docs/core-gaps.md) (PTY, LSP, MCP stdio, Loader,
 background jobs, vision, …). Third-party `dsh plugin add` packages do not
 mount here. Write a Cordis module and add it in `src/compose.ts`.
+
+## Limitations
+
+These are platform facts of this host, not a DSH feature backlog.
+
+| Limit | What you hit |
+|---|---|
+| Linux sleep-wake | After `sleepAfter` (10m), the first Linux tool waits **~10s**: **~8.8s** for the official `cloudflare/sandbox:0.12.9` image to come up on `basic` (¼ vCPU), then **~1.3s** to `unsquashfs` `/workspace`. A warm `uname` is **~55ms**. Login and chat-only turns do not start the box. `prefetch()` begins at a Linux `tool_call`, not on send. Prompt-keyword warmup is not on: it would only hide ~2s of DeepSeek and can hold a `max_instances` slot for 10m. Numbers: [`docs/containers.md`](docs/containers.md). |
+| Whole-disk snapshots | Cloudflare `persistAcrossSessions` / machine snapshots are **private beta** (docs still say coming soon as of 2026-09). They are not used here. When they GA, restore is advertised around **2s**, not the warm 55ms path. Memory snapshots (resume running processes) are later still. |
+| Directory backup | `createBackup` / `restoreBackup` of `/workspace` **is** shipped. Production uses `localBucket: true` so backups work without R2 S3 tokens; restore **extracts** instead of a FUSE overlay, so that 1.3s grows with the tree. Disk is ephemeral across sleep until restore. |
+| Capacity | `max_instances` is **5 running** containers, not registered users. Sleeping sandboxes do not take a slot. Default identity is one shared `"owner"` sandbox. |
+| Identity / Access | `IDENTITY_MODE=per-user` is off until an operator sets it. Cloudflare Access is off until `TEAM_DOMAIN` and `POLICY_AUD` are set; until then the access-key cookie is the gate, and anyone with the URL and the key shares `"owner"`. |
+| Fly.io | Feasible as a **second** execution backend (Machines + a guest agent), not a drop-in for `@cloudflare/sandbox`. A slim guest plus a volume could wake in **~0.5–2s**, but stopped rootfs and volumes still bill while idle (~$0.15/GB-month each). Not the default. Exploration: [`docs/sandbox-flyio.md`](docs/sandbox-flyio.md). |
+| Official DSH surface | No PTY, LSP, MCP stdio, YAML Loader, background jobs, vision, or `dsh plugin add`. See [`docs/core-gaps.md`](docs/core-gaps.md). |
+
+Do not treat a live container as a permanent machine. Cloudflare can SIGTERM a running instance. Waiting on official disk snapshots, or optionally a Fly SKU behind `ctx.execution`, is how the ~10s wake goes down — not by swapping the official sandbox image for Alpine.
 
 ## Requirements
 
@@ -202,13 +220,21 @@ Seams: [`docs/plugins.md`](docs/plugins.md).
 
 ## Documentation
 
+The teaching book (English and 中文, Mermaid diagrams) starts at
+[`docs/book/README.md`](docs/book/README.md). Living design docs remain
+the operator contract. The reading site is built with `node site/build.mjs`
+and deployed to GitHub Pages; see [`docs/site.md`](docs/site.md).
+
 | Doc | Role |
 |---|---|
+| [`docs/book/README.md`](docs/book/README.md) | Bilingual book: twelve chapters, EN + 中文 |
 | [`docs/architecture.md`](docs/architecture.md) | System design: products, objects, turn, identity |
 | [`docs/web.md`](docs/web.md) | SPA surfaces, auth, `/api` |
 | [`docs/containers.md`](docs/containers.md) | Sandbox sleep, disk, backup/restore |
 | [`docs/plugins.md`](docs/plugins.md) | How to write plugins |
 | [`docs/core-gaps.md`](docs/core-gaps.md) | Official DSH that this runtime cannot take 1:1 |
+| [`docs/sandbox-flyio.md`](docs/sandbox-flyio.md) | Fly Machines vs Cloudflare Containers (exploration) |
+| [`docs/site.md`](docs/site.md) | Docs site and GitHub Pages |
 | [`docs/design-cloudflare-native.md`](docs/design-cloudflare-native.md) | Original redesign plan (historical) |
 
 ## License

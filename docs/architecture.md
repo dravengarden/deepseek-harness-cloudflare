@@ -14,7 +14,9 @@ plugins assume a Node host. Those do not belong in a Worker isolate. Bash
 and `/workspace` belong in a container. The Cordis kernel belongs in an
 isolate that can hibernate and come back from a log.
 
-That split is the whole design.
+That split is the whole design. A bilingual teaching narrative of the
+same split lives in [`book/README.md`](book/README.md). This file remains
+the operator contract.
 
 ## Cloudflare products
 
@@ -171,10 +173,16 @@ Landlock policy in the Worker.
   `createBackup({ localBucket: true })`, stores the handle on the Sandbox
   DO, then `stop()`. Next start restores only if `/workspace/.dsh-cf` is
   missing.
+- Start is lazy: first Linux `tool_call` prefetches `ready()`. Sleep-wake
+  is ~10s (~8.8s container wake + ~1.3s `unsquashfs` restore); a warm
+  `uname` is ~55ms. Do not speculative-warmup on every prompt — see
+  [`containers.md`](containers.md).
 - Mutating tools under `workspace-write` ask Allow/Deny. `glob`, `grep`,
   and `str_replace_editor` `view` do not. Plan mode refuses mutating tools.
 
-See [`containers.md`](containers.md).
+See [`containers.md`](containers.md). Fly.io as an alternative execution
+backend is explored in [`sandbox-flyio.md`](sandbox-flyio.md); it is
+not the default.
 
 ## Web surfaces
 

@@ -16,3 +16,6 @@ test:
     npm test
 
 verify: check test
+
+site:
+    node site/build.mjs

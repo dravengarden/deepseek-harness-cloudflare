@@ -42,8 +42,93 @@ window, `onActivityExpired()` calls `stop()`. Billing stops when it sleeps.
 does **not** set keepAlive. The sandbox starts on first Linux tool use and
 is allowed to sleep.
 
-Cloudflare can still SIGTERM a running instance for platform reasons. Do not
-treat a live container as a permanent machine.
+## Cold start vs warmup
+
+Linux is already lazy: login, session list, and a chat-only turn do not
+start the container. `AgentLoop` calls `execution.prefetch()` as soon as
+a Linux `tool_call` delta arrives, so wake overlaps the rest of the LLM
+stream and any Allow/Deny prompt. That path has no false positives.
+
+Production, 2026-09-13, `maa05`, image `cloudflare/sandbox:0.12.9`,
+`basic`. Auth-gated `POST /api/sandbox/probe` times `ready()` (`bootMs`)
+then `uname` (`execMs`). `POST /api/sandbox/sleep` snapshots `/workspace`
+and `stop()`s so the next probe is a true sleep-wake.
+
+Sleep-wake `boot()` breakdown (restore **hit**, extra mkdir/marker RPCs skipped):
+
+| Step | ms | What |
+|---:|---:|---|
+| `handleMs` | 13 | Sandbox DO `loadWorkspaceBackup()` |
+| `wakeMs` | **8768** | First container RPC (`exists`): provision Firecracker + wait for sandbox port 3000 + default session |
+| `restoreMs` | **1288** | `restoreBackup` with `localBucket: true` (R2 binding → write squashfs → `unsquashfs`) |
+| `ensureMs` | 0 | skipped on restore hit |
+| `execMs` | 58 | `uname` after the box is up |
+| **boot total** | **10056** | |
+
+| Path | bootMs | execMs | notes |
+|---|---:|---:|---|
+| After explicit `stop()` | **~10s** | ~55 | ~8.8s wake + ~1.3s extract |
+| Chat turn after `stop()` (prefetch at `tool_call`) | — | **7732** wait after `tool/call` | LLM to `tool_call` **2119ms**; first `tool/result` **9851ms** |
+| Same isolate, box already up | **0** | ~55 | cached `bootPromise` |
+| Chat turn, box already up | — | **313** wait after `tool/call` | permissions + tool wrap; LLM **2–4s** |
+
+Cloudflare documents container cold starts in the **1–3s** range. The
+~8.8s wake is the official image coming up in `maa05`, not our loop.
+`uname` itself is ~55ms either way.
+
+### What is worth changing
+
+| Change | Expected win | Cost |
+|---|---|---|
+| Skip extra exists/mkdir/writeFile after restore (**done**) | ~0.5–0.8s | none |
+| Production FUSE overlay restore (`localBucket` only for `wrangler dev`) | restore ~1.3s → mount (~0.2–0.5s); stays flat as `/workspace` grows | needs R2 S3 tokens (`CLOUDFLARE_ACCOUNT_ID` + access key) |
+| `transport: "rpc"` | slightly faster restore write (stream vs HTTP base64) | SDK path change; measure first |
+| Longer `sleepAfter` (e.g. 30m) | fewer 10s hits | `basic` instance stays billed idle longer |
+| `keepAlive: true` | no sleep-wake | instance never sleeps; must `destroy()` |
+| Session-open / first-keystroke `prefetch()` | hides the 8.8s behind typing | one `max_instances` slot per identity |
+| Prompt-keyword prefetch on send | hides ~2s of LLM only | false positives hold a slot 10m |
+| Custom slimmer image | maybe closer to CF's 1–3s | leave official `cloudflare/sandbox` |
+
+Do **not** expect to turn 8.8s into 1s from harness code. That wait is
+container provision + the sandbox daemon. Hide it or sleep less often.
+
+### Image size vs entrypoint
+
+`docker.io/cloudflare/sandbox:0.12.9` is **not** the hello-world image the
+1–3s FAQ was measured on. Local inspect: **~225MB** image bytes, Docker
+reports **~850MB** virtual; layers include Debian, Node (~125MB), Bun
+(~100MB), the sandbox control-plane binary (~100MB), and `cloudflared`.
+Our Carrack scanners are ~11MB by comparison.
+
+Cloudflare pre-fetches images onto nodes, and our sleep-wake is still
+~8.8s — so this is **not** an image *pull*. It is start + entrypoint on
+`basic` (¼ vCPU). The official image also sets
+`JAVASCRIPT_POOL_MIN_SIZE=3` and `TYPESCRIPT_POOL_MIN_SIZE=3` (Python
+pool 0), so the daemon may pre-spawn interpreter workers before port
+3000 is ready.
+
+Community pattern on Cloudflare Containers: keep warm (`keepAlive` /
+healthcheck), wait for disk snapshots, or shrink *your own* app image.
+Do not replace the official sandbox image with Alpine; the SDK requires
+that control plane. A safe experiment is overriding the pool env vars to
+`0` in our Dockerfile if we do not use the JS/TS interpreter.
+
+A prompt-keyword / “looks like Linux” warmup on **every user message is
+not worth adding**. DeepSeek already spends ~2s before the first
+`tool_call`. Starting the box at send time only hides that 2s; the user
+still waits ~6–8s after seeing `bash`. A wrong guess holds a `basic`
+instance until `sleepAfter` (10m) and occupies a `max_instances` slot.
+
+The only heuristic with a window large enough to hide ~8–10s is
+**session-open / first keystroke** warmup (user is typing while the box
+comes up). That is optional and identity-sensitive: fine while
+`IDENTITY_MODE` is shared-owner (one sandbox); expensive once per-user
+sandboxes share `max_instances: 5`. Leave it off until logs show
+sleep-wake is the common path.
+
+Do **not** start Linux on `/api/login`. Cloudflare can still SIGTERM a
+running instance for platform reasons. Do not treat a live container as
+a permanent machine.
 
 ## Persistent filesystem
 
@@ -63,12 +148,14 @@ Official Sandbox storage options today:
 | `createBackup` / `restoreBackup` of `/workspace` | Project directory should come back after sleep |
 | Bucket mount (`mountBucket`) | A **separate** path such as `/data` should persist independently |
 
-Docs are explicit: restore in production is a FUSE overlay that **vanishes
-on the next sleep**. Store the `DirectoryBackup` handle (KV, D1, or Durable
-Object storage) and restore again. Restoring the same handle while the
-overlay is still mounted discards the upper layer, so this host restores
-only when `/workspace/.dsh-cf` is missing — the documented “files gone after
-sleep” check.
+Official production restore (no `localBucket`) is a FUSE overlay that
+**vanishes on the next sleep**. This host currently sets
+`localBucket: true` even in production so backups work without R2 S3
+tokens; restore then **extracts** with `unsquashfs` (~1.3s today, grows
+with `/workspace`). Store the `DirectoryBackup` handle and restore
+again. Restore only when `/workspace/.dsh-cf` is missing — the documented
+“files gone after sleep” check. On the FUSE path, restoring the same
+handle while the overlay is still mounted would discard the upper layer.
 
 Backup runs on the official Container hook `onActivityExpired` (idle
 `sleepAfter = "10m"`), then `stop()`. That is one R2 snapshot per sleep, not

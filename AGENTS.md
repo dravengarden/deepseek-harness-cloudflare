@@ -36,3 +36,7 @@ snapshot every turn.
   Do not claim Access is configured if those secrets are unset.
 - Do not trust `Cf-Access-Authenticated-User-Email` without verifying the JWT.
 - `just verify` / `npm run verify` is the project gate.
+- Documentation site: `node site/build.mjs` → `site/dist`. Do not commit
+  `site/dist`. GitHub Pages workflow is `.github/workflows/pages.yml`.
+  Keep the site for reading (type size, auto light/dark). Do not turn it
+  into a marketing page.
