@@ -50,9 +50,23 @@
     })
   })
 
-  document.addEventListener("click", () => closeAll())
+  const menu = document.querySelector("[data-menu]")
+  const sidebar = document.querySelector(".sidebar")
+
+  function closeSidebar() {
+    sidebar?.classList.remove("expanded")
+    menu?.setAttribute("aria-expanded", "false")
+  }
+
+  document.addEventListener("click", (event) => {
+    closeAll()
+    if (!event.target.closest(".sidebar") && !event.target.closest("[data-menu]")) closeSidebar()
+  })
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeAll()
+    if (event.key === "Escape") {
+      closeAll()
+      closeSidebar()
+    }
   })
 
   document.querySelectorAll("[data-theme-set]").forEach((btn) => {
@@ -70,10 +84,9 @@
   })
   apply(localStorage.getItem(KEY) || "auto")
 
-  const menu = document.querySelector("[data-menu]")
-  const sidebar = document.querySelector(".sidebar")
   menu?.addEventListener("click", (event) => {
     event.stopPropagation()
+    if (!sidebar) return
     const open = sidebar.classList.toggle("expanded")
     menu.setAttribute("aria-expanded", String(open))
   })

@@ -261,6 +261,10 @@ a:hover {
   min-height: calc(100vh - var(--header-h));
 }
 
+.home .layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar {
   border-right: 1px solid var(--border);
   background: var(--bg-aside);
@@ -461,15 +465,22 @@ a:hover {
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1199px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar {
     display: none;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    bottom: 0;
+    width: min(18rem, 86vw);
+    z-index: 9;
+    border-right: 1px solid var(--border);
+    overflow: auto;
+    box-shadow: 6px 0 24px rgba(28, 27, 24, 0.12);
   }
 
   .sidebar.expanded {

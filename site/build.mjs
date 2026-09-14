@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto"
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, copyFileSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -6,6 +7,14 @@ import { fileURLToPath } from "node:url"
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const dist = join(root, "site", "dist")
 const GH = "https://github.com/dravengarden/deepseek-harness-cloudflare"
+
+function hash8(rel) {
+  return createHash("sha256").update(readFileSync(join(root, rel))).digest("hex").slice(0, 8)
+}
+
+const cssV = hash8("site/styles.css")
+const themeV = hash8("site/theme.js")
+const mermaidV = hash8("site/mermaid-boot.js")
 
 const EN_CHAPTERS = [
   ["00-preface", "Preface"],
@@ -287,7 +296,7 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
   <meta name="theme-color" content="#141310" media="(prefers-color-scheme: dark)">
   <meta name="description" content="${escapeHtml(t.description)}">
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="${prefix}styles.css">
+  <link rel="stylesheet" href="${prefix}styles.css?v=${cssV}">
 </head>
 <body class="${home ? "home" : ""}">
   <a class="skip" href="#main">${t.skip}</a>
@@ -299,7 +308,7 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
       <a href="${GH}">${t.github}</a>
     </nav>
     <div class="tools">
-      <button class="menu-toggle" type="button" data-menu aria-expanded="false">${t.menu}</button>
+      ${home ? "" : `<button class="menu-toggle" type="button" data-menu aria-expanded="false">${t.menu}</button>`}
       ${langSwitcher(lang, enHref, zhHref)}
       <div class="menu" data-menu-box data-theme-menu>
         <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true">${t.auto}</button>
@@ -312,9 +321,7 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
     </div>
   </header>
   <div class="layout">
-    <aside class="sidebar">
-      ${nav}
-    </aside>
+    ${home ? "" : `<aside class="sidebar">${nav}</aside>`}
     <main id="main" class="article">
       <div class="prose">
         ${body}
@@ -322,8 +329,8 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
       </div>
     </main>
   </div>
-  <script src="${prefix}theme.js"></script>
-  <script type="module" src="${prefix}mermaid-boot.js"></script>
+  <script src="${prefix}theme.js?v=${themeV}"></script>
+  <script type="module" src="${prefix}mermaid-boot.js?v=${mermaidV}"></script>
 </body>
 </html>
 `
