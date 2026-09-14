@@ -174,50 +174,85 @@ a:hover {
   margin-left: auto;
 }
 
-.tools button,
-.tools .select select {
+.tools .menu-toggle {
   appearance: none;
-  background: var(--bg);
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 0.8rem;
-  padding: 0.25rem 1.4rem 0.25rem 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
 }
 
-.tools button {
-  padding: 0.25rem 0.5rem;
-}
-
-.tools .select {
+.menu {
   position: relative;
-  display: inline-flex;
 }
 
-.tools .select::after {
-  content: "";
-  position: absolute;
-  right: 0.45rem;
-  top: 50%;
-  width: 0.35rem;
-  height: 0.35rem;
-  pointer-events: none;
-  border-right: 1.5px solid var(--muted);
-  border-bottom: 1.5px solid var(--muted);
-  transform: translateY(-70%) rotate(45deg);
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+.menu-btn {
+  appearance: none;
+  background: transparent;
   border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 1rem 0.2rem 0.2rem;
+  cursor: pointer;
+}
+
+.menu-btn::after {
+  content: "";
+  display: inline-block;
+  width: 0.32rem;
+  height: 0.32rem;
+  margin-left: 0.35rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-1px) rotate(45deg);
+}
+
+.menu.open .menu-btn,
+.menu-btn:hover {
+  color: var(--text);
+}
+
+.menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  min-width: 8.5rem;
+  padding: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(28, 27, 24, 0.12);
+  z-index: 20;
+}
+
+.menu-list a,
+.menu-list button {
+  display: block;
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  text-decoration: none;
+  padding: 0.35rem 0.55rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.menu-list a:hover,
+.menu-list button:hover {
+  background: var(--code-bg);
+}
+
+.menu-list [aria-current="true"] {
+  font-weight: 650;
 }
 
 .layout {

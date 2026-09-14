@@ -230,15 +230,16 @@ function rewriteLinks(markdown, fromRel) {
 }
 
 function langSwitcher(lang, enHref, zhHref) {
-  const enSel = lang === "zh" ? "" : " selected"
-  const zhSel = lang === "zh" ? " selected" : ""
-  return `<label class="select">
-      <span class="visually-hidden">Language</span>
-      <select data-lang data-en="${enHref}" data-zh="${zhHref}" aria-label="Language">
-        <option value="en"${enSel}>English</option>
-        <option value="zh"${zhSel}>中文</option>
-      </select>
-    </label>`
+  const enCur = lang === "zh" ? "" : ' aria-current="true"'
+  const zhCur = lang === "zh" ? ' aria-current="true"' : ""
+  const label = lang === "zh" ? "中文" : "English"
+  return `<div class="menu" data-menu-box>
+      <button type="button" class="menu-btn" aria-expanded="false" aria-haspopup="true">${label}</button>
+      <div class="menu-list" hidden>
+        <a href="${enHref}" lang="en"${enCur}>English</a>
+        <a href="${zhHref}" lang="zh"${zhCur}>中文</a>
+      </div>
+    </div>`
 }
 
 function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref }) {
@@ -266,14 +267,14 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
     <div class="tools">
       <button class="menu-toggle" type="button" data-menu aria-expanded="false">Menu</button>
       ${langSwitcher(lang, enHref, zhHref)}
-      <label class="select">
-        <span class="visually-hidden">Theme</span>
-        <select data-theme aria-label="Theme">
-          <option value="auto">Auto</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </label>
+      <div class="menu" data-menu-box data-theme-menu>
+        <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true">Auto</button>
+        <div class="menu-list" hidden>
+          <button type="button" data-theme-set="auto">Auto</button>
+          <button type="button" data-theme-set="light">Light</button>
+          <button type="button" data-theme-set="dark">Dark</button>
+        </div>
+      </div>
     </div>
   </header>
   <div class="layout">
