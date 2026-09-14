@@ -187,8 +187,14 @@ a:hover {
   text-decoration: none;
 }
 
-.tools button[aria-pressed="true"] {
+.tools button[aria-pressed="true"],
+.lang a[aria-current="true"] {
   background: var(--code-bg);
+}
+
+.lang {
+  display: inline-flex;
+  gap: 0.25rem;
 }
 
 .layout {

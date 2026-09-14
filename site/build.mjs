@@ -229,12 +229,18 @@ function rewriteLinks(markdown, fromRel) {
   })
 }
 
-function layout({ title, lang, prefix, nav, body, pager, home, altHref }) {
-  const other = lang === "zh"
-    ? `<a class="tool" href="${altHref ?? `${prefix}en/00-preface.html`}">EN</a>`
-    : `<a class="tool" href="${altHref ?? `${prefix}zh/00-preface.html`}">中文</a>`
+function langSwitcher(lang, enHref, zhHref) {
+  const enCur = lang === "zh" ? "" : ' aria-current="true"'
+  const zhCur = lang === "zh" ? ' aria-current="true"' : ""
+  return `<span class="lang" role="group" aria-label="Language">
+      <a class="tool" href="${enHref}"${enCur} lang="en">EN</a>
+      <a class="tool" href="${zhHref}"${zhCur} lang="zh">中文</a>
+    </span>`
+}
+
+function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref }) {
   return `<!doctype html>
-<html lang="${lang}">
+<html lang="${lang === "zh" ? "zh-Hans" : "en"}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -256,7 +262,7 @@ function layout({ title, lang, prefix, nav, body, pager, home, altHref }) {
     </nav>
     <div class="tools">
       <button class="menu-toggle" type="button" data-menu aria-expanded="false">Menu</button>
-      ${other}
+      ${langSwitcher(lang, enHref, zhHref)}
       <button type="button" data-theme-set="auto">Auto</button>
       <button type="button" data-theme-set="light">Light</button>
       <button type="button" data-theme-set="dark">Dark</button>
@@ -301,7 +307,7 @@ function navHtml(lang, current) {
     const cur = current === `reference/${id}.html` ? ' aria-current="page"' : ""
     return `<li><a href="${href}"${cur}>${escapeHtml(label)}</a></li>`
   }).join("")
-  return `<h2>${bookLabel}</h2><ol>${bookLinks}</ol><h2>${refLabel}</h2><ul>${refLinks}</ul>`
+  return `<nav aria-label="${bookLabel}"><h2>${bookLabel}</h2><ol>${bookLinks}</ol><h2>${refLabel}</h2><ul>${refLinks}</ul></nav>`
 }
 
 function pagerHtml(lang, id) {
@@ -343,10 +349,12 @@ function emitMarkdown(srcRel, outRel, lang, extraPager) {
   const rewritten = rewriteLinks(src, srcRel)
   const body = renderMarkdown(rewritten)
   const title = pageTitle(src, outRel)
-  const altHref = outRel.startsWith("en/")
-    ? `../zh/${outRel.slice(3)}`
+  const file = outRel.split("/").pop()
+  const enHref = outRel.startsWith("zh/") ? `../en/${file}` : file
+  const zhHref = outRel.startsWith("en/")
+    ? `../zh/${file}`
     : outRel.startsWith("zh/")
-      ? `../en/${outRel.slice(3)}`
+      ? file
       : "../zh/00-preface.html"
   const html = layout({
     title: `${title} · DSH on Cloudflare`,
@@ -356,7 +364,8 @@ function emitMarkdown(srcRel, outRel, lang, extraPager) {
     body,
     pager: extraPager,
     home: false,
-    altHref,
+    enHref,
+    zhHref,
   })
   write(join(dist, outRel), html)
 }
@@ -377,7 +386,8 @@ const home = layout({
   prefix: "",
   nav: navHtml("en", "index.html"),
   home: true,
-  altHref: "zh/00-preface.html",
+  enHref: "index.html",
+  zhHref: "zh/00-preface.html",
   body: `
     <h1>DeepSeek Harness on Cloudflare</h1>
     <p class="lede">Workers-native host. Cordis kernel, Durable Object session log, Linux in Cloudflare Sandbox. A documentation site for reading — not a landing page.</p>
