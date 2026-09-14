@@ -79,6 +79,34 @@
     })
   })
 
+  function bindChoice(storageKey, attr, defaultValue, labelSel, btnSel, dataKey) {
+    const labelEl = document.querySelector(labelSel)
+    const buttons = [...document.querySelectorAll(btnSel)]
+    const names = {}
+    function applyChoice(value) {
+      const stored = value || localStorage.getItem(storageKey) || defaultValue
+      localStorage.setItem(storageKey, stored)
+      root.setAttribute(attr, stored)
+      if (labelEl) labelEl.textContent = names[stored] ?? stored
+      buttons.forEach((btn) => {
+        btn.setAttribute("aria-current", String(btn.dataset[dataKey] === stored))
+      })
+    }
+    buttons.forEach((btn) => {
+      const key = btn.dataset[dataKey]
+      if (key && btn.textContent.trim()) names[key] = btn.textContent.trim()
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation()
+        applyChoice(key)
+        closeAll()
+      })
+    })
+    applyChoice(localStorage.getItem(storageKey) || defaultValue)
+  }
+
+  bindChoice("dsh-docs-font", "data-font", "serif", "[data-font-label]", "[data-font-set]", "fontSet")
+  bindChoice("dsh-docs-size", "data-size", "md", "[data-size-label]", "[data-size-set]", "sizeSet")
+
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if ((localStorage.getItem(KEY) || "auto") === "auto") apply("auto")
   })

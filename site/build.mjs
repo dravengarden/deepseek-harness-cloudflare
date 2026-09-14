@@ -251,6 +251,13 @@ function chrome(lang) {
       auto: "自动",
       light: "浅色",
       dark: "深色",
+      font: "字体",
+      serif: "宋体",
+      sans: "黑体",
+      size: "字号",
+      sizeS: "小",
+      sizeM: "中",
+      sizeL: "大",
       brand: "DSH on Cloudflare",
       description: "Cloudflare 上 DeepSeek Harness 的文档。",
     }
@@ -264,6 +271,13 @@ function chrome(lang) {
     auto: "Auto",
     light: "Light",
     dark: "Dark",
+    font: "Font",
+    serif: "Serif",
+    sans: "Sans",
+    size: "Size",
+    sizeS: "Small",
+    sizeM: "Medium",
+    sizeL: "Large",
     brand: "DSH on Cloudflare",
     description: "Documentation for DeepSeek Harness on Cloudflare.",
   }
@@ -297,6 +311,17 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
   <meta name="description" content="${escapeHtml(t.description)}">
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="${prefix}styles.css?v=${cssV}">
+  <script>
+  try {
+    const r = document.documentElement
+    const t = localStorage.getItem("dsh-docs-theme")
+    const f = localStorage.getItem("dsh-docs-font")
+    const s = localStorage.getItem("dsh-docs-size")
+    if (t && t !== "auto") r.setAttribute("data-theme", t)
+    if (f) r.setAttribute("data-font", f)
+    if (s) r.setAttribute("data-size", s)
+  } catch (e) {}
+  </script>
 </head>
 <body class="${home ? "home" : ""}">
   <a class="skip" href="#main">${t.skip}</a>
@@ -310,6 +335,21 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
     <div class="tools">
       ${home ? "" : `<button class="menu-toggle" type="button" data-menu aria-expanded="false">${t.menu}</button>`}
       ${langSwitcher(lang, enHref, zhHref)}
+      <div class="menu" data-menu-box>
+        <button type="button" class="menu-btn" data-font-label aria-expanded="false" aria-haspopup="true" aria-label="${t.font}">${t.serif}</button>
+        <div class="menu-list" hidden>
+          <button type="button" data-font-set="serif">${t.serif}</button>
+          <button type="button" data-font-set="sans">${t.sans}</button>
+        </div>
+      </div>
+      <div class="menu" data-menu-box>
+        <button type="button" class="menu-btn" data-size-label aria-expanded="false" aria-haspopup="true" aria-label="${t.size}">${t.sizeM}</button>
+        <div class="menu-list" hidden>
+          <button type="button" data-size-set="sm">${t.sizeS}</button>
+          <button type="button" data-size-set="md">${t.sizeM}</button>
+          <button type="button" data-size-set="lg">${t.sizeL}</button>
+        </div>
+      </div>
       <div class="menu" data-menu-box data-theme-menu>
         <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true">${t.auto}</button>
         <div class="menu-list" hidden>
@@ -442,7 +482,6 @@ function homeBody(lang) {
           intro: "Agent = Model + Harness。这个移植保留官方内核，其余跑在 Workers 上。书是教学叙述；参考页是运维契约。",
           book: "书",
           reference: "参考",
-          note: "明暗跟随系统主题。需要覆盖时，用页眉的自动 / 浅色 / 深色。正文字号按阅读设置（约 18px，行宽 40rem）。",
         }
       : {
           h1: "DeepSeek Harness on Cloudflare",
@@ -450,7 +489,6 @@ function homeBody(lang) {
           intro: "Agent = Model + Harness. This port keeps the official kernel and hosts the rest on Workers. The book is the teaching narrative; the reference pages are the operator contract.",
           book: "Book",
           reference: "Reference",
-          note: "Light and dark follow the system theme. Use Auto / Light / Dark in the header if you need to override. Type is sized for reading (about 18px, 40rem measure).",
         }
   return `
     <h1>${t.h1}</h1>
@@ -464,7 +502,6 @@ function homeBody(lang) {
     <ul>
       ${REFERENCE.map(([id, en, zh]) => `<li><a href="${refPrefix}${id}.html">${escapeHtml(lang === "zh" ? zh : en)}</a></li>`).join("\n")}
     </ul>
-    <p>${t.note}</p>
   `
 }
 

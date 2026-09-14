@@ -17,10 +17,10 @@ python3 -m http.server 4173 --directory site/dist
 Open `http://127.0.0.1:4173/`. The default language is **English** (`/`).
 Chinese lives on its own home (`/zh/`). Each page is one language; switch
 in the header. The site does not sniff `Accept-Language` and does not mix
-English and 中文 on the same page. Type is about 18px, measure 40rem,
-system serif. Theme follows `prefers-color-scheme`. Header Auto / Light /
-Dark overrides and is stored in `localStorage`. Mermaid loads from jsDelivr
-and switches with the theme.
+English and 中文 on the same page. Header menus set language, font (serif /
+sans), size (small / medium / large), and theme (auto / light / dark).
+Choices are stored in `localStorage`. Mermaid loads from jsDelivr and
+switches with the theme.
 
 ## GitHub Pages
 
