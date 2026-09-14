@@ -175,26 +175,49 @@ a:hover {
 }
 
 .tools button,
-.tools a.tool {
+.tools .select select {
   appearance: none;
-  background: transparent;
+  background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 0.8rem;
-  padding: 0.2rem 0.45rem;
+  padding: 0.25rem 1.4rem 0.25rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
-  text-decoration: none;
 }
 
-.tools button[aria-pressed="true"],
-.lang a[aria-current="true"] {
-  background: var(--code-bg);
+.tools button {
+  padding: 0.25rem 0.5rem;
 }
 
-.lang {
+.tools .select {
+  position: relative;
   display: inline-flex;
-  gap: 0.25rem;
+}
+
+.tools .select::after {
+  content: "";
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  width: 0.35rem;
+  height: 0.35rem;
+  pointer-events: none;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .layout {

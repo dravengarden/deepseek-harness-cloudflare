@@ -1,13 +1,14 @@
 (() => {
   const KEY = "dsh-docs-theme"
   const root = document.documentElement
-  const buttons = [...document.querySelectorAll("[data-theme-set]")]
+  const themeSelect = document.querySelector("[data-theme]")
+  const langSelect = document.querySelector("[data-lang]")
 
   function preferred() {
     return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
   }
 
-  function current() {
+  function resolved() {
     const stored = localStorage.getItem(KEY) || "auto"
     return stored === "auto" ? preferred() : stored
   }
@@ -17,19 +18,20 @@
     localStorage.setItem(KEY, stored)
     if (stored === "auto") root.removeAttribute("data-theme")
     else root.setAttribute("data-theme", stored)
-    buttons.forEach((btn) => {
-      btn.setAttribute("aria-pressed", String(btn.dataset.themeSet === stored))
-    })
-    document.dispatchEvent(new CustomEvent("docs-theme", { detail: current() }))
+    if (themeSelect) themeSelect.value = stored
+    document.dispatchEvent(new CustomEvent("docs-theme", { detail: resolved() }))
   }
 
-  buttons.forEach((btn) => {
-    btn.addEventListener("click", () => apply(btn.dataset.themeSet))
-  })
+  themeSelect?.addEventListener("change", () => apply(themeSelect.value))
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if ((localStorage.getItem(KEY) || "auto") === "auto") apply("auto")
   })
   apply(localStorage.getItem(KEY) || "auto")
+
+  langSelect?.addEventListener("change", () => {
+    const href = langSelect.value === "zh" ? langSelect.dataset.zh : langSelect.dataset.en
+    if (href) location.href = href
+  })
 
   const menu = document.querySelector("[data-menu]")
   const sidebar = document.querySelector(".sidebar")

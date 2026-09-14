@@ -230,12 +230,15 @@ function rewriteLinks(markdown, fromRel) {
 }
 
 function langSwitcher(lang, enHref, zhHref) {
-  const enCur = lang === "zh" ? "" : ' aria-current="true"'
-  const zhCur = lang === "zh" ? ' aria-current="true"' : ""
-  return `<span class="lang" role="group" aria-label="Language">
-      <a class="tool" href="${enHref}"${enCur} lang="en">EN</a>
-      <a class="tool" href="${zhHref}"${zhCur} lang="zh">中文</a>
-    </span>`
+  const enSel = lang === "zh" ? "" : " selected"
+  const zhSel = lang === "zh" ? " selected" : ""
+  return `<label class="select">
+      <span class="visually-hidden">Language</span>
+      <select data-lang data-en="${enHref}" data-zh="${zhHref}" aria-label="Language">
+        <option value="en"${enSel}>English</option>
+        <option value="zh"${zhSel}>中文</option>
+      </select>
+    </label>`
 }
 
 function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref }) {
@@ -263,9 +266,14 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
     <div class="tools">
       <button class="menu-toggle" type="button" data-menu aria-expanded="false">Menu</button>
       ${langSwitcher(lang, enHref, zhHref)}
-      <button type="button" data-theme-set="auto">Auto</button>
-      <button type="button" data-theme-set="light">Light</button>
-      <button type="button" data-theme-set="dark">Dark</button>
+      <label class="select">
+        <span class="visually-hidden">Theme</span>
+        <select data-theme aria-label="Theme">
+          <option value="auto">Auto</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
     </div>
   </header>
   <div class="layout">
