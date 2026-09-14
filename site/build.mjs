@@ -57,6 +57,26 @@ const REFERENCE = [
   ["sandbox-flyio", "Fly.io", "Fly.io"],
 ]
 
+const FONTS = [
+  ["serif", "Serif", "衬线"],
+  ["georgia", "Georgia", "Georgia"],
+  ["palatino", "Palatino", "Palatino"],
+  ["charter", "Charter", "Charter"],
+  ["times", "Times", "Times"],
+  ["song", "Songti", "宋体"],
+  ["kai", "Kaiti", "楷体"],
+  ["fangsong", "Fangsong", "仿宋"],
+  "---",
+  ["sans", "Sans", "黑体"],
+  ["helvetica", "Helvetica", "Helvetica"],
+  ["arial", "Arial", "Arial"],
+  ["pingfang", "PingFang", "苹方"],
+  "---",
+  ["mono", "Mono", "等宽"],
+]
+
+const SIZES = ["14", "16", "18", "20", "22", "24", "28"]
+
 function escapeHtml(text) {
   return text
     .replaceAll("&", "&amp;")
@@ -248,16 +268,13 @@ function chrome(lang) {
       reference: "参考",
       github: "GitHub",
       menu: "目录",
+      language: "语言",
       auto: "自动",
       light: "浅色",
       dark: "深色",
       font: "字体",
-      serif: "宋体",
-      sans: "黑体",
       size: "字号",
-      sizeS: "小",
-      sizeM: "中",
-      sizeL: "大",
+      theme: "主题",
       brand: "DSH on Cloudflare",
       description: "Cloudflare 上 DeepSeek Harness 的文档。",
     }
@@ -268,30 +285,71 @@ function chrome(lang) {
     reference: "Reference",
     github: "GitHub",
     menu: "Menu",
+    language: "Language",
     auto: "Auto",
     light: "Light",
     dark: "Dark",
     font: "Font",
-    serif: "Serif",
-    sans: "Sans",
     size: "Size",
-    sizeS: "Small",
-    sizeM: "Medium",
-    sizeL: "Large",
+    theme: "Theme",
     brand: "DSH on Cloudflare",
     description: "Documentation for DeepSeek Harness on Cloudflare.",
   }
 }
 
 function langSwitcher(lang, enHref, zhHref) {
+  const t = chrome(lang)
   const enCur = lang === "zh" ? "" : ' aria-current="true"'
   const zhCur = lang === "zh" ? ' aria-current="true"' : ""
   const label = lang === "zh" ? "中文" : "English"
   return `<div class="menu" data-menu-box>
+      <span class="menu-kicker">${t.language}</span>
       <button type="button" class="menu-btn" aria-expanded="false" aria-haspopup="true">${label}</button>
       <div class="menu-list" hidden>
         <a href="${enHref}" lang="en"${enCur}>English</a>
         <a href="${zhHref}" lang="zh"${zhCur}>中文</a>
+      </div>
+    </div>`
+}
+
+function fontMenu(lang) {
+  const t = chrome(lang)
+  const current = lang === "zh" ? "衬线" : "Serif"
+  const items = FONTS.map((row) => {
+    if (row === "---") return `<div class="menu-sep" role="separator"></div>`
+    const [id, en, zh] = row
+    return `<button type="button" data-font-set="${id}">${escapeHtml(lang === "zh" ? zh : en)}</button>`
+  }).join("\n")
+  return `<div class="menu" data-menu-box>
+      <span class="menu-kicker">${t.font}</span>
+      <button type="button" class="menu-btn" data-font-label aria-expanded="false" aria-haspopup="true" aria-label="${t.font}">${current}</button>
+      <div class="menu-list menu-list-long" hidden>
+        ${items}
+      </div>
+    </div>`
+}
+
+function sizeMenu(lang) {
+  const t = chrome(lang)
+  const items = SIZES.map((n) => `<button type="button" data-size-set="${n}">${n}</button>`).join("\n")
+  return `<div class="menu" data-menu-box>
+      <span class="menu-kicker">${t.size}</span>
+      <button type="button" class="menu-btn" data-size-label aria-expanded="false" aria-haspopup="true" aria-label="${t.size}">18</button>
+      <div class="menu-list" hidden>
+        ${items}
+      </div>
+    </div>`
+}
+
+function themeMenu(lang) {
+  const t = chrome(lang)
+  return `<div class="menu" data-menu-box data-theme-menu>
+      <span class="menu-kicker">${t.theme}</span>
+      <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true" aria-label="${t.theme}">${t.auto}</button>
+      <div class="menu-list" hidden>
+        <button type="button" data-theme-set="auto">${t.auto}</button>
+        <button type="button" data-theme-set="light">${t.light}</button>
+        <button type="button" data-theme-set="dark">${t.dark}</button>
       </div>
     </div>`
 }
@@ -319,7 +377,7 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
     const s = localStorage.getItem("dsh-docs-size")
     if (t && t !== "auto") r.setAttribute("data-theme", t)
     if (f) r.setAttribute("data-font", f)
-    if (s) r.setAttribute("data-size", s)
+    if (s) r.setAttribute("data-size", ({ sm: "16", md: "18", lg: "20" })[s] || s)
   } catch (e) {}
   </script>
 </head>
@@ -335,29 +393,9 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
     <div class="tools">
       ${home ? "" : `<button class="menu-toggle" type="button" data-menu aria-expanded="false">${t.menu}</button>`}
       ${langSwitcher(lang, enHref, zhHref)}
-      <div class="menu" data-menu-box>
-        <button type="button" class="menu-btn" data-font-label aria-expanded="false" aria-haspopup="true" aria-label="${t.font}">${t.serif}</button>
-        <div class="menu-list" hidden>
-          <button type="button" data-font-set="serif">${t.serif}</button>
-          <button type="button" data-font-set="sans">${t.sans}</button>
-        </div>
-      </div>
-      <div class="menu" data-menu-box>
-        <button type="button" class="menu-btn" data-size-label aria-expanded="false" aria-haspopup="true" aria-label="${t.size}">${t.sizeM}</button>
-        <div class="menu-list" hidden>
-          <button type="button" data-size-set="sm">${t.sizeS}</button>
-          <button type="button" data-size-set="md">${t.sizeM}</button>
-          <button type="button" data-size-set="lg">${t.sizeL}</button>
-        </div>
-      </div>
-      <div class="menu" data-menu-box data-theme-menu>
-        <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true">${t.auto}</button>
-        <div class="menu-list" hidden>
-          <button type="button" data-theme-set="auto">${t.auto}</button>
-          <button type="button" data-theme-set="light">${t.light}</button>
-          <button type="button" data-theme-set="dark">${t.dark}</button>
-        </div>
-      </div>
+      ${fontMenu(lang)}
+      ${sizeMenu(lang)}
+      ${themeMenu(lang)}
     </div>
   </header>
   <div class="layout">

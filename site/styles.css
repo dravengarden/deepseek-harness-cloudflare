@@ -10,7 +10,7 @@
   --code-text: #1c1b18;
   --mark: #1c1b18;
   --focus: #0b4f9c;
-  --header-h: 3rem;
+  --header-h: 3.4rem;
   --sidebar-w: 16rem;
   --measure: 40rem;
 }
@@ -65,33 +65,40 @@
 }
 
 html {
-  font-size: 112.5%;
+  --body-font: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif;
+  font-size: 18px;
   scroll-padding-top: calc(var(--header-h) + 0.75rem);
 }
 
-html[data-size="sm"] {
-  font-size: 100%;
-}
+html[data-size="14"] { font-size: 14px; }
+html[data-size="16"] { font-size: 16px; }
+html[data-size="18"] { font-size: 18px; }
+html[data-size="20"] { font-size: 20px; }
+html[data-size="22"] { font-size: 22px; }
+html[data-size="24"] { font-size: 24px; }
+html[data-size="28"] { font-size: 28px; }
 
-html[data-size="md"] {
-  font-size: 112.5%;
-}
-
-html[data-size="lg"] {
-  font-size: 125%;
-}
+html[data-font="serif"] { --body-font: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif; }
+html[data-font="georgia"] { --body-font: Georgia, "Times New Roman", serif; }
+html[data-font="palatino"] { --body-font: Palatino, "Palatino Linotype", "Book Antiqua", "Iowan Old Style", serif; }
+html[data-font="charter"] { --body-font: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif; }
+html[data-font="times"] { --body-font: "Times New Roman", Times, serif; }
+html[data-font="song"] { --body-font: "Songti SC", "Songti TC", STSong, SimSun, "Noto Serif SC", "Noto Serif CJK SC", serif; }
+html[data-font="kai"] { --body-font: "Kaiti SC", "Kaiti TC", STKaiti, KaiTi, serif; }
+html[data-font="fangsong"] { --body-font: "STFangsong", FangSong, "Songti SC", serif; }
+html[data-font="sans"] { --body-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+html[data-font="helvetica"] { --body-font: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+html[data-font="arial"] { --body-font: Arial, Helvetica, sans-serif; }
+html[data-font="pingfang"] { --body-font: "PingFang SC", "PingFang TC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei", sans-serif; }
+html[data-font="mono"] { --body-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, serif;
+  font-family: var(--body-font);
   line-height: 1.7;
   text-rendering: optimizeLegibility;
-}
-
-html[data-font="sans"] body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 code,
@@ -145,7 +152,7 @@ a:hover {
   padding: 0.35rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
-  font-size: 0.9rem;
+  font-size: 14px;
 }
 
 .brand {
@@ -180,8 +187,8 @@ a:hover {
 
 .tools {
   display: flex;
-  align-items: center;
-  gap: 0.15rem;
+  align-items: flex-end;
+  gap: 0.7rem;
   margin-left: auto;
 }
 
@@ -190,7 +197,7 @@ a:hover {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.85em;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
@@ -198,6 +205,19 @@ a:hover {
 
 .menu {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.menu-kicker {
+  font-size: 0.68em;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.2;
+  padding: 0 0.2rem;
 }
 
 .menu-btn {
@@ -206,8 +226,8 @@ a:hover {
   border: 0;
   color: var(--muted);
   font: inherit;
-  font-size: 0.85rem;
-  padding: 0.2rem 1rem 0.2rem 0.2rem;
+  font-size: 0.95em;
+  padding: 0.1rem 1rem 0.15rem 0.2rem;
   cursor: pointer;
 }
 
@@ -232,12 +252,24 @@ a:hover {
   right: 0;
   top: calc(100% + 0.35rem);
   min-width: 8.5rem;
+  max-height: min(24rem, calc(100vh - 5rem));
+  overflow: auto;
   padding: 0.25rem;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 8px 20px rgba(28, 27, 24, 0.12);
   z-index: 20;
+}
+
+.menu-list-long {
+  min-width: 10rem;
+}
+
+.menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 0.3rem 0.4rem;
 }
 
 .menu-list a,
@@ -249,7 +281,7 @@ a:hover {
   border: 0;
   color: var(--text);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.95em;
   text-align: left;
   text-decoration: none;
   padding: 0.35rem 0.55rem;
@@ -266,6 +298,20 @@ a:hover {
   font-weight: 650;
 }
 
+.menu-list [data-font-set="serif"] { font-family: ui-serif, Palatino, Georgia, serif; }
+.menu-list [data-font-set="georgia"] { font-family: Georgia, serif; }
+.menu-list [data-font-set="palatino"] { font-family: Palatino, "Palatino Linotype", serif; }
+.menu-list [data-font-set="charter"] { font-family: Charter, Georgia, serif; }
+.menu-list [data-font-set="times"] { font-family: "Times New Roman", Times, serif; }
+.menu-list [data-font-set="song"] { font-family: "Songti SC", STSong, SimSun, serif; }
+.menu-list [data-font-set="kai"] { font-family: "Kaiti SC", STKaiti, KaiTi, serif; }
+.menu-list [data-font-set="fangsong"] { font-family: "STFangsong", FangSong, serif; }
+.menu-list [data-font-set="sans"] { font-family: ui-sans-serif, system-ui, sans-serif; }
+.menu-list [data-font-set="helvetica"] { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.menu-list [data-font-set="arial"] { font-family: Arial, Helvetica, sans-serif; }
+.menu-list [data-font-set="pingfang"] { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+.menu-list [data-font-set="mono"] { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
 .layout {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
@@ -280,7 +326,7 @@ a:hover {
   border-right: 1px solid var(--border);
   background: var(--bg-aside);
   padding: 1rem 0.9rem 2.5rem;
-  font-size: 0.85rem;
+  font-size: 13px;
   line-height: 1.45;
 }
 

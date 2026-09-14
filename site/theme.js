@@ -79,12 +79,15 @@
     })
   })
 
+  const SIZE_LEGACY = { sm: "16", md: "18", lg: "20" }
+
   function bindChoice(storageKey, attr, defaultValue, labelSel, btnSel, dataKey) {
     const labelEl = document.querySelector(labelSel)
     const buttons = [...document.querySelectorAll(btnSel)]
     const names = {}
     function applyChoice(value) {
-      const stored = value || localStorage.getItem(storageKey) || defaultValue
+      let stored = value || localStorage.getItem(storageKey) || defaultValue
+      if (storageKey === "dsh-docs-size" && SIZE_LEGACY[stored]) stored = SIZE_LEGACY[stored]
       localStorage.setItem(storageKey, stored)
       root.setAttribute(attr, stored)
       if (labelEl) labelEl.textContent = names[stored] ?? stored
@@ -105,7 +108,7 @@
   }
 
   bindChoice("dsh-docs-font", "data-font", "serif", "[data-font-label]", "[data-font-set]", "fontSet")
-  bindChoice("dsh-docs-size", "data-size", "md", "[data-size-label]", "[data-size-set]", "sizeSet")
+  bindChoice("dsh-docs-size", "data-size", "18", "[data-size-label]", "[data-size-set]", "sizeSet")
 
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if ((localStorage.getItem(KEY) || "auto") === "auto") apply("auto")
