@@ -457,37 +457,27 @@ a:hover {
   padding-left: 1.2rem;
 }
 
+.menu-toggle {
+  display: none;
+}
+
 @media (max-width: 860px) {
   .layout {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
+    display: none;
     border-right: 0;
     border-bottom: 1px solid var(--border);
-    padding-bottom: 0.75rem;
   }
 
-  .sidebar nav {
-    display: none;
-  }
-
-  .sidebar.expanded nav {
+  .sidebar.expanded {
     display: block;
   }
 
   .menu-toggle {
     display: inline-flex;
-  }
-}
-
-.menu-toggle {
-  display: none;
-}
-
-@media (min-width: 861px) {
-  .menu-toggle {
-    display: none !important;
   }
 }
 
