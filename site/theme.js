@@ -19,7 +19,7 @@
     localStorage.setItem(KEY, stored)
     if (stored === "auto") root.removeAttribute("data-theme")
     else root.setAttribute("data-theme", stored)
-    if (themeLabel) themeLabel.textContent = labels[stored] ?? "Auto"
+    if (themeLabel) themeLabel.textContent = labels[stored] ?? labels.auto
     document.querySelectorAll("[data-theme-set]").forEach((btn) => {
       btn.setAttribute("aria-current", String(btn.dataset.themeSet === stored))
     })
@@ -56,6 +56,8 @@
   })
 
   document.querySelectorAll("[data-theme-set]").forEach((btn) => {
+    const key = btn.dataset.themeSet
+    if (key && btn.textContent.trim()) labels[key] = btn.textContent.trim()
     btn.addEventListener("click", (event) => {
       event.stopPropagation()
       apply(btn.dataset.themeSet)

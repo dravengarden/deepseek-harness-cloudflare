@@ -452,29 +452,6 @@ a:hover {
   margin: 0 0 1.25rem;
 }
 
-.home-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1.25rem 0 2rem;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-}
-
-.home-actions a {
-  display: inline-block;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  text-decoration: none;
-  color: var(--text);
-}
-
-.home-actions a.primary {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
-}
-
 .toc-inline {
   margin: 0;
   padding-left: 1.2rem;

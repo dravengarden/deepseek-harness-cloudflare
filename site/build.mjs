@@ -40,12 +40,12 @@ const ZH_CHAPTERS = [
 ]
 
 const REFERENCE = [
-  ["architecture", "Architecture"],
-  ["web", "Web"],
-  ["containers", "Containers"],
-  ["plugins", "Plugins"],
-  ["core-gaps", "Core gaps"],
-  ["sandbox-flyio", "Fly.io"],
+  ["architecture", "Architecture", "架构"],
+  ["web", "Web", "Web"],
+  ["containers", "Containers", "容器"],
+  ["plugins", "Plugins", "插件"],
+  ["core-gaps", "Core gaps", "内核缺口"],
+  ["sandbox-flyio", "Fly.io", "Fly.io"],
 ]
 
 function escapeHtml(text) {
@@ -207,7 +207,9 @@ function rewriteLinks(markdown, fromRel) {
     const suffix = hash ? `#${hash}` : ""
     const resolved = join(dirname(fromRel), path)
     let next = path
-    if (resolved.endsWith("README.md") && resolved.includes("docs/book")) next = "../index.html"
+    if (resolved.endsWith("README.md") && resolved.includes("docs/book")) {
+      next = fromRel.includes("/book/zh/") ? "index.html" : "../index.html"
+    }
     else if (resolved.endsWith("README.md")) next = `${GH}/blob/main/README.md`
     else if (path.endsWith(".md")) {
       const name = path.replace(/\.md$/, ".html")
@@ -229,6 +231,35 @@ function rewriteLinks(markdown, fromRel) {
   })
 }
 
+function chrome(lang) {
+  if (lang === "zh") {
+    return {
+      skip: "跳到正文",
+      book: "书",
+      reference: "参考",
+      github: "GitHub",
+      menu: "目录",
+      auto: "自动",
+      light: "浅色",
+      dark: "深色",
+      brand: "DSH on Cloudflare",
+      description: "Cloudflare 上 DeepSeek Harness 的文档。",
+    }
+  }
+  return {
+    skip: "Skip to content",
+    book: "Book",
+    reference: "Reference",
+    github: "GitHub",
+    menu: "Menu",
+    auto: "Auto",
+    light: "Light",
+    dark: "Dark",
+    brand: "DSH on Cloudflare",
+    description: "Documentation for DeepSeek Harness on Cloudflare.",
+  }
+}
+
 function langSwitcher(lang, enHref, zhHref) {
   const enCur = lang === "zh" ? "" : ' aria-current="true"'
   const zhCur = lang === "zh" ? ' aria-current="true"' : ""
@@ -243,6 +274,9 @@ function langSwitcher(lang, enHref, zhHref) {
 }
 
 function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref }) {
+  const t = chrome(lang)
+  const homeLink = lang === "zh" ? `${prefix}zh/index.html` : `${prefix}index.html`
+  const bookLink = `${prefix}${lang === "zh" ? "zh" : "en"}/00-preface.html`
   return `<!doctype html>
 <html lang="${lang === "zh" ? "zh-Hans" : "en"}">
 <head>
@@ -251,28 +285,28 @@ function layout({ title, lang, prefix, nav, body, pager, home, enHref, zhHref })
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#141310" media="(prefers-color-scheme: dark)">
-  <meta name="description" content="Documentation for DeepSeek Harness on Cloudflare.">
+  <meta name="description" content="${escapeHtml(t.description)}">
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="${prefix}styles.css">
 </head>
 <body class="${home ? "home" : ""}">
-  <a class="skip" href="#main">Skip to content</a>
+  <a class="skip" href="#main">${t.skip}</a>
   <header class="site-header">
-    <a class="brand" href="${prefix}index.html">DSH on Cloudflare</a>
-    <nav aria-label="Primary">
-      <a href="${prefix}en/00-preface.html">Book</a>
-      <a href="${prefix}reference/architecture.html">Reference</a>
-      <a href="${GH}">GitHub</a>
+    <a class="brand" href="${homeLink}">${t.brand}</a>
+    <nav aria-label="${lang === "zh" ? "主导航" : "Primary"}">
+      <a href="${bookLink}">${t.book}</a>
+      <a href="${prefix}reference/architecture.html">${t.reference}</a>
+      <a href="${GH}">${t.github}</a>
     </nav>
     <div class="tools">
-      <button class="menu-toggle" type="button" data-menu aria-expanded="false">Menu</button>
+      <button class="menu-toggle" type="button" data-menu aria-expanded="false">${t.menu}</button>
       ${langSwitcher(lang, enHref, zhHref)}
       <div class="menu" data-menu-box data-theme-menu>
-        <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true">Auto</button>
+        <button type="button" class="menu-btn" data-theme-label aria-expanded="false" aria-haspopup="true">${t.auto}</button>
         <div class="menu-list" hidden>
-          <button type="button" data-theme-set="auto">Auto</button>
-          <button type="button" data-theme-set="light">Light</button>
-          <button type="button" data-theme-set="dark">Dark</button>
+          <button type="button" data-theme-set="auto">${t.auto}</button>
+          <button type="button" data-theme-set="light">${t.light}</button>
+          <button type="button" data-theme-set="dark">${t.dark}</button>
         </div>
       </div>
     </div>
@@ -311,10 +345,10 @@ function navHtml(lang, current) {
     })
     .join("")
   const prefix = current.startsWith("reference/") ? "" : current.includes("/") ? "../reference/" : "reference/"
-  const refLinks = REFERENCE.map(([id, label]) => {
+  const refLinks = REFERENCE.map(([id, en, zh]) => {
     const href = `${prefix}${id}.html`
     const cur = current === `reference/${id}.html` ? ' aria-current="page"' : ""
-    return `<li><a href="${href}"${cur}>${escapeHtml(label)}</a></li>`
+    return `<li><a href="${href}"${cur}>${escapeHtml(lang === "zh" ? zh : en)}</a></li>`
   }).join("")
   return `<nav aria-label="${bookLabel}"><h2>${bookLabel}</h2><ol>${bookLinks}</ol><h2>${refLabel}</h2><ul>${refLinks}</ul></nav>`
 }
@@ -364,7 +398,7 @@ function emitMarkdown(srcRel, outRel, lang, extraPager) {
     ? `../zh/${file}`
     : outRel.startsWith("zh/")
       ? file
-      : "../zh/00-preface.html"
+      : "../zh/index.html"
   const html = layout({
     title: `${title} · DSH on Cloudflare`,
     lang,
@@ -389,35 +423,61 @@ for (const [id] of REFERENCE) {
   emitMarkdown(`docs/${id}.md`, `reference/${id}.html`, "en", "")
 }
 
-const home = layout({
-  title: "DeepSeek Harness on Cloudflare",
-  lang: "en",
-  prefix: "",
-  nav: navHtml("en", "index.html"),
-  home: true,
-  enHref: "index.html",
-  zhHref: "zh/00-preface.html",
-  body: `
-    <h1>DeepSeek Harness on Cloudflare</h1>
-    <p class="lede">Workers-native host. Cordis kernel, Durable Object session log, Linux in Cloudflare Sandbox. A documentation site for reading — not a landing page.</p>
-    <p>Agent = Model + Harness. This port keeps the official kernel and hosts the rest on Workers. The book is the teaching narrative; the reference pages are the operator contract.</p>
-    <div class="home-actions">
-      <a class="primary" href="en/00-preface.html">Read in English</a>
-      <a href="zh/00-preface.html">中文阅读</a>
-      <a href="${GH}">GitHub</a>
-    </div>
-    <h2>Book</h2>
+function homeBody(lang) {
+  const chapters = lang === "zh" ? ZH_CHAPTERS : EN_CHAPTERS
+  const chPrefix = lang === "zh" ? "" : "en/"
+  const refPrefix = lang === "zh" ? "../reference/" : "reference/"
+  const t =
+    lang === "zh"
+      ? {
+          h1: "Cloudflare 上的 DeepSeek Harness",
+          lede: "Workers 原生宿主。Cordis 内核、Durable Object 会话日志、Cloudflare Sandbox 里的 Linux。这是阅读用的文档站，不是落地页。",
+          intro: "Agent = Model + Harness。这个移植保留官方内核，其余跑在 Workers 上。书是教学叙述；参考页是运维契约。",
+          book: "书",
+          reference: "参考",
+          note: "明暗跟随系统主题。需要覆盖时，用页眉的自动 / 浅色 / 深色。正文字号按阅读设置（约 18px，行宽 40rem）。",
+        }
+      : {
+          h1: "DeepSeek Harness on Cloudflare",
+          lede: "Workers-native host. Cordis kernel, Durable Object session log, Linux in Cloudflare Sandbox. A documentation site for reading — not a landing page.",
+          intro: "Agent = Model + Harness. This port keeps the official kernel and hosts the rest on Workers. The book is the teaching narrative; the reference pages are the operator contract.",
+          book: "Book",
+          reference: "Reference",
+          note: "Light and dark follow the system theme. Use Auto / Light / Dark in the header if you need to override. Type is sized for reading (about 18px, 40rem measure).",
+        }
+  return `
+    <h1>${t.h1}</h1>
+    <p class="lede">${t.lede}</p>
+    <p>${t.intro}</p>
+    <h2>${t.book}</h2>
     <ol class="toc-inline">
-      ${EN_CHAPTERS.map(([id, label]) => `<li><a href="en/${id}.html">${escapeHtml(label)}</a> · <a href="zh/${id}.html">${escapeHtml(ZH_CHAPTERS.find((row) => row[0] === id)?.[1] ?? "")}</a></li>`).join("\n")}
+      ${chapters.map(([id, label]) => `<li><a href="${chPrefix}${id}.html">${escapeHtml(label)}</a></li>`).join("\n")}
     </ol>
-    <h2>Reference</h2>
+    <h2>${t.reference}</h2>
     <ul>
-      ${REFERENCE.map(([id, label]) => `<li><a href="reference/${id}.html">${escapeHtml(label)}</a></li>`).join("\n")}
+      ${REFERENCE.map(([id, en, zh]) => `<li><a href="${refPrefix}${id}.html">${escapeHtml(lang === "zh" ? zh : en)}</a></li>`).join("\n")}
     </ul>
-    <p>Light and dark follow the system theme. Use Auto / Light / Dark in the header if you need to override. Type is sized for reading (about 18px, 40rem measure).</p>
-  `,
-})
-write(join(dist, "index.html"), home)
+    <p>${t.note}</p>
+  `
+}
+
+function emitHome(lang) {
+  const outRel = lang === "zh" ? "zh/index.html" : "index.html"
+  const html = layout({
+    title: lang === "zh" ? "Cloudflare 上的 DeepSeek Harness" : "DeepSeek Harness on Cloudflare",
+    lang,
+    prefix: prefixFor(outRel),
+    nav: navHtml(lang, outRel),
+    home: true,
+    enHref: lang === "zh" ? "../index.html" : "index.html",
+    zhHref: lang === "zh" ? "index.html" : "zh/index.html",
+    body: homeBody(lang),
+  })
+  write(join(dist, outRel), html)
+}
+
+emitHome("en")
+emitHome("zh")
 
 const notFound = `<!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=./index.html"><title>Not found</title><p><a href="./index.html">Home</a></p>`
 write(join(dist, "404.html"), notFound)
